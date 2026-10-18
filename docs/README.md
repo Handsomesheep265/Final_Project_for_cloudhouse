@@ -40,7 +40,7 @@
 
 ## 技术栈
 - 前端：React+Vite+npm
-- 后端：Java+Spring Boot+MySQL
+- 后端：Node.js+Express+MySQL
 - 部署：还没到这一步，到时候再说。
 
 
