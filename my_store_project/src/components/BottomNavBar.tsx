@@ -1,55 +1,75 @@
+import { NavLink } from 'react-router-dom'
 import type { NavKey } from '../types'
+import type { RoutePath } from '../router/paths'
+import { ROUTES } from '../router/paths'
 import type { IconComponent } from './Icons'
 import { CartIcon, HomeIcon, UserIcon } from './Icons'
 import styles from './BottomNavBar.module.css'
 
-interface NavItem {
+interface BaseNavItem {
   key: NavKey
   label: string
-  href: string
   icon: IconComponent
 }
 
 /**
+ * 已实现的页面用 to 走 React Router 跳转；
+ * 尚未实现的入口（个人主页）继续用 href 做占位，等页面做出来后改成 to 即可。
+ */
+type NavItem = BaseNavItem &
+  ({ to: RoutePath; href?: never } | { href: string; to?: never })
+
+/**
  * 底部导航栏（README：首页入口 / 购物车入口 / 个人主页入口）
- * ----------------------------------------------------------------------------
- * 当前用 hash 链接占位，避免为了一个页面就引入路由依赖；
- * 接入 React Router 后，把 <a href> 换成 <NavLink to> 即可。
+ * 高亮状态由当前路由决定，不需要外部再传 activeKey。
  */
 const NAV_ITEMS: NavItem[] = [
-  { key: 'home', label: '首页', href: '#top', icon: HomeIcon },
-  { key: 'cart', label: '购物车', href: '#cart', icon: CartIcon },
-  { key: 'profile', label: '个人主页', href: '#profile', icon: UserIcon },
+  { key: 'home', label: '首页', icon: HomeIcon, to: ROUTES.home },
+  { key: 'cart', label: '购物车', icon: CartIcon, to: ROUTES.cart },
+  { key: 'profile', label: '个人主页', icon: UserIcon, href: '#profile' },
 ]
 
 export interface BottomNavBarProps {
-  activeKey?: NavKey
   cartCount?: number
 }
 
-export default function BottomNavBar({ activeKey = 'home', cartCount = 0 }: BottomNavBarProps) {
+export default function BottomNavBar({ cartCount = 0 }: BottomNavBarProps) {
   return (
     <nav className={styles.bar} aria-label="底部导航">
       <ul className={styles.list}>
-        {NAV_ITEMS.map(({ key, label, href, icon: Icon }) => {
-          const isActive = key === activeKey
-          const showBadge = key === 'cart' && cartCount > 0
+        {NAV_ITEMS.map((item) => {
+          const Icon = item.icon
+          const showBadge = item.key === 'cart' && cartCount > 0
+
+          const content = (
+            <>
+              <span className={styles.iconWrap}>
+                <Icon size={19} />
+                {showBadge && (
+                  <span className={styles.badge}>{cartCount > 99 ? '99+' : cartCount}</span>
+                )}
+              </span>
+              <span className={styles.label}>{item.label}</span>
+            </>
+          )
 
           return (
-            <li key={key}>
-              <a
-                className={isActive ? `${styles.item} ${styles.itemActive}` : styles.item}
-                href={href}
-                aria-current={isActive ? 'page' : undefined}
-              >
-                <span className={styles.iconWrap}>
-                  <Icon size={19} />
-                  {showBadge && (
-                    <span className={styles.badge}>{cartCount > 99 ? '99+' : cartCount}</span>
-                  )}
-                </span>
-                <span className={styles.label}>{label}</span>
-              </a>
+            <li key={item.key}>
+              {item.to !== undefined ? (
+                <NavLink
+                  to={item.to}
+                  end
+                  className={({ isActive }) =>
+                    isActive ? `${styles.item} ${styles.itemActive}` : styles.item
+                  }
+                >
+                  {content}
+                </NavLink>
+              ) : (
+                <a className={styles.item} href={item.href}>
+                  {content}
+                </a>
+              )}
             </li>
           )
         })}

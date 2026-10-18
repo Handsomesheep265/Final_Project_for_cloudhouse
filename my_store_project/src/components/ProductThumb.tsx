@@ -22,6 +22,8 @@ export interface ProductThumbProps {
   className?: string
   /** 首屏可见的图片用 eager 加载 */
   priority?: boolean
+  /** 小尺寸展示（如购物车行），占位图会收紧字号并隐藏提示文字 */
+  compact?: boolean
 }
 
 /**
@@ -37,11 +39,14 @@ export default function ProductThumb({
   seed = 0,
   className = '',
   priority = false,
+  compact = false,
 }: ProductThumbProps) {
   const [failedSrc, setFailedSrc] = useState<string | null>(null)
   const url = getAsset(src)
   const showFallback = !url || failedSrc === url
-  const classes = [styles.thumb, className].filter(Boolean).join(' ')
+  const classes = [styles.thumb, compact ? styles.compact : '', className]
+    .filter(Boolean)
+    .join(' ')
 
   if (showFallback) {
     const tone = FALLBACK_TONES[Math.abs(seed) % FALLBACK_TONES.length]

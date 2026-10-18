@@ -55,6 +55,15 @@ export function CloseIcon(props: IconProps) {
   )
 }
 
+export function ArrowLeftIcon(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M19 12H5" />
+      <path d="m11 6-6 6 6 6" />
+    </Svg>
+  )
+}
+
 export function SunIcon(props: IconProps) {
   return (
     <Svg {...props}>
@@ -134,6 +143,14 @@ export function PlusIcon(props: IconProps) {
   return (
     <Svg {...props}>
       <path d="M12 5.4v13.2M5.4 12h13.2" />
+    </Svg>
+  )
+}
+
+export function MinusIcon(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M5.4 12h13.2" />
     </Svg>
   )
 }

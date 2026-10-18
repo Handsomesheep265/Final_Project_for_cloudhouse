@@ -1,0 +1,509 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  min-height: 100svh;
+  background: var(--bg);
+}
+
+/* ------------------------------ 页头 ------------------------------ */
+
+.header {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+}
+
+.headerInner {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 12px 24px;
+}
+
+.back {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--text-muted);
+  transition:
+    color var(--transition),
+    background-color var(--transition),
+    border-color var(--transition);
+}
+
+.back:hover {
+  color: var(--text);
+  border-color: var(--border-strong);
+  background: var(--surface-hover);
+}
+
+.title {
+  font-size: 17px;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+  color: var(--text);
+}
+
+.count {
+  padding: 2px 9px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  font-size: 11.5px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* ------------------------------ 主体 ------------------------------ */
+
+.main {
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  /* 底部留白：固定底部导航 + 结算栏，保证最后一行能滚到结算栏上方 */
+  padding: 20px 24px 176px;
+}
+
+.mainCentered {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 40px 24px 132px;
+}
+
+/* ------------------------------ 条目列表 ------------------------------ */
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+  max-width: 760px;
+  margin: 0 auto;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+  transition:
+    border-color var(--transition),
+    box-shadow var(--transition);
+}
+
+.row:hover {
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-md);
+}
+
+.thumbWrap {
+  flex: none;
+  width: 72px;
+  overflow: hidden;
+  border-radius: var(--radius-sm);
+}
+
+.info {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.infoTop {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.itemTitle {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  font-size: 13.5px;
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--text);
+}
+
+.remove {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  color: var(--text-subtle);
+  transition:
+    color var(--transition),
+    background-color var(--transition);
+}
+
+.remove:hover {
+  color: var(--danger);
+  background: var(--surface-hover);
+}
+
+.infoBottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.itemPrice {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 2px;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.itemPrice em {
+  font-style: normal;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.unit {
+  margin-left: 5px;
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--text-subtle);
+}
+
+/* 数量步进器 */
+
+.stepper {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+}
+
+.stepBtn {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: var(--radius-pill);
+  color: var(--text);
+  transition:
+    color var(--transition),
+    background-color var(--transition);
+}
+
+.stepBtn:hover:not(:disabled) {
+  background: var(--surface-hover);
+}
+
+.stepBtn:disabled {
+  color: var(--text-subtle);
+  opacity: 0.45;
+}
+
+.qty {
+  min-width: 26px;
+  text-align: center;
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+
+/* ------------------------------ 勾选框 ------------------------------ */
+
+.check {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+  cursor: pointer;
+  user-select: none;
+}
+
+.check input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.box {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 20px;
+  height: 20px;
+  border: 1px solid var(--border-strong);
+  border-radius: 50%;
+  background: var(--surface);
+  color: transparent;
+  transition:
+    background-color var(--transition),
+    border-color var(--transition),
+    color var(--transition);
+}
+
+.check:hover .box {
+  border-color: var(--accent);
+}
+
+.check input:checked + .box {
+  border-color: transparent;
+  background: var(--accent);
+  color: var(--text-on-accent);
+}
+
+.check input:focus-visible + .box {
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.summaryLabel {
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+
+/* ------------------------------ 结算栏 ------------------------------ */
+
+.summary {
+  position: fixed;
+  left: 50%;
+  bottom: 104px;
+  z-index: 55;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: min(760px, calc(100% - 48px));
+  padding: 10px 14px;
+  transform: translateX(-50%);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  /* 实色背景：列表从下方滚过时不会和结算栏文字互相干扰 */
+  background: var(--surface);
+  box-shadow: var(--shadow-lg);
+}
+
+.summaryRight {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-left: auto;
+}
+
+.selectedInfo {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.total {
+  font-size: 12.5px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.total strong {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--accent-strong);
+  font-variant-numeric: tabular-nums;
+}
+
+.checkout {
+  flex: none;
+  height: 36px;
+  padding: 0 18px;
+  border-radius: var(--radius-pill);
+  background: var(--accent);
+  color: var(--text-on-accent);
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  transition:
+    background-color var(--transition),
+    transform var(--transition);
+}
+
+.checkout:hover:not(:disabled) {
+  background: var(--accent-strong);
+}
+
+.checkout:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.checkout:disabled {
+  background: var(--surface-hover);
+  color: var(--text-subtle);
+}
+
+.note {
+  width: 100%;
+  max-width: 760px;
+  margin: 12px auto 0;
+  text-align: center;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* ------------------------------ 空购物车 ------------------------------ */
+
+.placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  max-width: 420px;
+  padding: 48px 32px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+  text-align: center;
+}
+
+.icon {
+  display: grid;
+  place-items: center;
+  width: 58px;
+  height: 58px;
+  margin-bottom: 4px;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+}
+
+.placeholderTitle {
+  font-size: 16px;
+  font-weight: 650;
+  color: var(--text);
+}
+
+.placeholderText {
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--text-muted);
+}
+
+.action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 38px;
+  margin-top: 8px;
+  padding: 0 22px;
+  border-radius: var(--radius-pill);
+  background: var(--accent);
+  color: var(--text-on-accent);
+  font-size: 13px;
+  font-weight: 600;
+  transition:
+    background-color var(--transition),
+    transform var(--transition);
+}
+
+.action:hover {
+  background: var(--accent-strong);
+}
+
+.action:active {
+  transform: scale(0.98);
+}
+
+/* ------------------------------ 响应式 ------------------------------ */
+
+@media (max-width: 600px) {
+  .headerInner {
+    padding: 10px 16px;
+  }
+
+  .main {
+    padding: 16px 16px 152px;
+  }
+
+  .mainCentered {
+    padding: 24px 16px 120px;
+  }
+
+  .row {
+    gap: 10px;
+    padding: 12px;
+  }
+
+  .thumbWrap {
+    width: 62px;
+  }
+
+  .itemTitle {
+    font-size: 12.5px;
+  }
+
+  .itemPrice {
+    font-size: 14px;
+  }
+
+  /* 结算栏上移，给底部导航（含刘海屏安全区）让位 */
+  .summary {
+    bottom: calc(84px + env(safe-area-inset-bottom));
+    width: calc(100% - 32px);
+    gap: 8px;
+    padding: 8px 12px;
+  }
+
+  .summaryRight {
+    gap: 8px;
+  }
+
+  .selectedInfo {
+    font-size: 11.5px;
+  }
+
+  .total strong {
+    font-size: 15px;
+  }
+
+  .checkout {
+    height: 34px;
+    padding: 0 14px;
+    font-size: 12.5px;
+  }
+
+  .placeholder {
+    padding: 36px 22px;
+  }
+}

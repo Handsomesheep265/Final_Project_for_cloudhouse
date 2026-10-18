@@ -135,8 +135,10 @@ CREATE TABLE cart_items (
     user_id BIGINT NOT NULL,
     product_id BIGINT NOT NULL,
     quantity INT DEFAULT 1,
+    is_selected TINYINT DEFAULT 1 COMMENT '1选中 0未选中',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_user_product (user_id, product_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 ```
 
@@ -146,8 +148,26 @@ CREATE TABLE cart_items (
 | user_id | BIGINT | 用户ID（关联 users.id） |
 | product_id | BIGINT | 商品ID（关联 products.id） |
 | quantity | INT | 购买数量 |
+| is_selected | TINYINT | 是否勾选：1选中 0未选中（用于“选中合计”） |
 | created_at | DATETIME | 创建时间 |
 | updated_at | DATETIME | 更新时间 |
+
+> 注 1：`(user_id, product_id)` 建立了唯一索引 `uk_user_product`，保证同一用户的同一商品在购物车里只占一行，
+> 避免前端重复加购时插入多行、导致数量与合计金额重复计算。
+> 加购直接用 upsert 累加数量即可（MySQL 8.0.19+ 的行别名写法）：
+>
+> ```sql
+> INSERT INTO cart_items (user_id, product_id, quantity) VALUES (1, 3, 2) AS new
+> ON DUPLICATE KEY UPDATE
+>     quantity = cart_items.quantity + new.quantity,
+>     is_selected = 1,
+>     updated_at = CURRENT_TIMESTAMP;
+> ```
+>
+> 若目标环境是 MySQL 8.0.19 之前的版本，把别名写法换成 `quantity = quantity + VALUES(quantity)`。
+>
+> 注 2：`is_selected` 只服务于购物车结算勾选，下单时不必写入 `order_items`；
+> 提交订单后该行会被删除，状态无需回写。
 
 ### 3.6 订单表 (orders)
 

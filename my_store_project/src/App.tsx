@@ -1,14 +1,14 @@
-import Homepage from './pages/Homepage'
+import { RouterProvider } from 'react-router-dom'
+import { router } from './router'
 
 /**
  * 应用入口
  * ----------------------------------------------------------------------------
- * 目前只实现了首页，因此直接渲染 <Homepage />；
- * 后续接入 React Router 时，把这里替换成 <Routes> / <Route> 即可，
- * 页面组件本身不需要改动。
+ * 路由配置集中在 src/router/index.tsx：目前有首页 `/` 与购物车 `/cart`。
+ * 新增页面时只需在路由表里追加，不用改这里。
  */
 function App() {
-  return <Homepage />
+  return <RouterProvider router={router} />
 }
 
 export default App

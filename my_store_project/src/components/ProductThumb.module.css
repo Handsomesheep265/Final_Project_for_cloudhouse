@@ -36,6 +36,15 @@
   opacity: 0.7;
 }
 
+/* 小尺寸（购物车行等）：收紧占位图，并省掉放不下的提示文字 */
+.compact .glyph {
+  font-size: 18px;
+}
+
+.compact .hint {
+  display: none;
+}
+
 .toneSunrise {
   background: linear-gradient(135deg, #fde6cd, #f6c7a4);
 }

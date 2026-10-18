@@ -5,6 +5,7 @@ import ProductListSection from '../components/ProductListSection'
 import BottomNavBar from '../components/BottomNavBar'
 import { CATEGORIES, PRODUCTS } from '../utils/mockData'
 import { ALL_CATEGORY_ID, applyProductFilters, pickRecommended } from '../utils/productFilters'
+import { useCartStore, selectTotalQuantity } from '../stores/cartStore'
 import { useTheme } from '../utils/useTheme'
 import type { Product, SortKey, ToastMessage } from '../types'
 import styles from './Homepage.module.css'
@@ -29,6 +30,10 @@ const DEFAULT_SORT: SortKey = 'default'
 export default function Homepage() {
   const { theme, toggleTheme } = useTheme()
 
+  // 购物车（Zustand）：角标订阅商品总件数，加购直接写入 store
+  const addToCart = useCartStore((state) => state.addItem)
+  const cartTotalQuantity = useCartStore(selectTotalQuantity)
+
   // 顶部导航栏
   const [keyword, setKeyword] = useState('')
   const [activeCategoryId, setActiveCategoryId] = useState<number>(ALL_CATEGORY_ID)
@@ -39,7 +44,6 @@ export default function Homepage() {
 
   // 交互状态
   const [favoriteIds, setFavoriteIds] = useState<ReadonlySet<number>>(() => new Set([3, 5]))
-  const [cartCount, setCartCount] = useState(0)
   const [recommendOffset, setRecommendOffset] = useState(0)
   const [toast, setToast] = useState<ToastMessage | null>(null)
 
@@ -74,10 +78,13 @@ export default function Homepage() {
     })
   }, [])
 
-  const handleAddToCart = useCallback((product: Product) => {
-    setCartCount((current) => current + 1)
-    setToast({ id: Date.now(), text: `「${product.title}」已加入购物车` })
-  }, [])
+  const handleAddToCart = useCallback(
+    (product: Product) => {
+      addToCart(product)
+      setToast({ id: Date.now(), text: `「${product.title}」已加入购物车` })
+    },
+    [addToCart],
+  )
 
   const handleClearFilters = useCallback(() => {
     setKeyword('')
@@ -164,7 +171,7 @@ export default function Homepage() {
         </footer>
       </main>
 
-      <BottomNavBar cartCount={cartCount} />
+      <BottomNavBar cartCount={cartTotalQuantity} />
 
       <div
         className={toast ? `${styles.toast} ${styles.toastVisible}` : styles.toast}
