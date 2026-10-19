@@ -1,0 +1,4 @@
+# 根目录 .gitignore 已经覆盖了 dist/ 与 node_modules/，
+# 这里只补上后端独有的本地环境变量文件（含数据库密码）。
+.env
+.env.local

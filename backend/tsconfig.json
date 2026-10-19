@@ -7,9 +7,14 @@
 
     // Environment Settings
     // See also https://aka.ms/tsconfig/module
-    "module": "commonjs",
+    // 用 node16：既能按 package.json 的 "type": "commonjs" 输出 CJS，
+    // 又能按 Node 的规则解析依赖（mysql2 的类型里用 './x.js' 引用子模块，
+    // 旧的 node10 解析会把它当成 any，导致 Pool 上找不到 execute 方法）。
+    "module": "node16",
+    "moduleResolution": "node16",
     "target": "es2024",
-    "types": [],
+    // 后端要跑在 Node 上，需要 Node 的类型（process、Buffer、node:* 模块）
+    "types": ["node"],
     // For nodejs:
     // "lib": ["esnext"],
     // "types": ["node"],
@@ -35,7 +40,10 @@
     // Recommended Options
     "strict": true,
     "jsx": "react-jsx",
-    "verbatimModuleSyntax": true,
+    // 原来是 true：verbatimModuleSyntax=true 会禁止一切值导入/导出
+    // （TS1287 / TS1295），连 `import { createPool } from 'mysql2/promise'`
+    // 都编译不过。关掉后由 tsc 正常把 import 编译成 require。
+    "verbatimModuleSyntax": false,
     "isolatedModules": true,
     "noUncheckedSideEffectImports": true,
     "moduleDetection": "force",
