@@ -1,5 +1,9 @@
 # 线上手帐集市 - 数据库设计文档
 
+> 仓库里提供了可直接执行的脚本：`backend/src/sql/schema.sql`（建表）与 `backend/src/sql/seed.sql`（种子数据），
+> 或在 `backend/` 下运行 `npm run db:init`（读取 `backend/.env` 的数据库配置，库不存在时会自动创建）。
+> 脚本与本文档保持一致，后续改表结构请同步更新两边。
+
 
 ## 一、模块划分
 

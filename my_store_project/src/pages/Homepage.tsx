@@ -6,6 +6,7 @@ import BottomNavBar from '../components/BottomNavBar'
 import { CATEGORIES, PRODUCTS } from '../utils/mockData'
 import { ALL_CATEGORY_ID, applyProductFilters, pickRecommended } from '../utils/productFilters'
 import { useCartStore, selectTotalQuantity } from '../stores/cartStore'
+import { ApiError } from '../api/client'
 import { useTheme } from '../utils/useTheme'
 import type { Product, SortKey, ToastMessage } from '../types'
 import styles from './Homepage.module.css'
@@ -30,9 +31,15 @@ const DEFAULT_SORT: SortKey = 'default'
 export default function Homepage() {
   const { theme, toggleTheme } = useTheme()
 
-  // 购物车（Zustand）：角标订阅商品总件数，加购直接写入 store
+  // 购物车（Zustand + 后端接口）：角标订阅服务端汇总的件数
   const addToCart = useCartStore((state) => state.addItem)
+  const fetchCart = useCartStore((state) => state.fetchCart)
   const cartTotalQuantity = useCartStore(selectTotalQuantity)
+
+  // 进入首页时拉一次购物车，用于底部角标（失败也不阻塞首页）
+  useEffect(() => {
+    void fetchCart()
+  }, [fetchCart])
 
   // 顶部导航栏
   const [keyword, setKeyword] = useState('')
@@ -78,10 +85,20 @@ export default function Homepage() {
     })
   }, [])
 
+  // 加购走真实接口：成功/失败都用同一处 toast 反馈（例如库存不足时显示后端文案）
   const handleAddToCart = useCallback(
     (product: Product) => {
-      addToCart(product)
-      setToast({ id: Date.now(), text: `「${product.title}」已加入购物车` })
+      void (async () => {
+        try {
+          await addToCart(product.id)
+          setToast({ id: Date.now(), text: `「${product.title}」已加入购物车` })
+        } catch (error) {
+          setToast({
+            id: Date.now(),
+            text: error instanceof ApiError ? error.message : '加入购物车失败，请稍后重试',
+          })
+        }
+      })()
     },
     [addToCart],
   )

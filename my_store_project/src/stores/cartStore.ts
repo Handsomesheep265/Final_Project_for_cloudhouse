@@ -1,238 +1,163 @@
-import { create } from 'zustand'
-import { persist } from 'zustand/middleware'
-import type { CartItem, Product } from '../types'
-
 /**
- * 购物车状态（对应 docs/DATABASE_DESIGN.md 的 cart_items 表）
+ * 购物车状态（接口驱动）
  * ----------------------------------------------------------------------------
- * 只做本地状态与规则校验，不关心接口。后端接好后：
- *   1. 进入页面时用 replaceItems() 灌入 GET /api/cart 的结果；
- *   2. 各 action 内部再补一次调用（POST/PUT/DELETE /api/cart）；
- *   3. 拿到数据库自增 id 后，把负数 id 的本地行替换掉。
- * 在此之前用 persist 落本地存储，刷新页面购物车不会丢。
+ * 数据来源是后端 /api/cart：服务端返回整车的 items + summary，
+ * 每次写操作成功后直接用响替换本地状态 —— 合计金额、选中合计都由服务端算，
+ * 前端不再自己维护一份，避免两边算不一致。
+ *
+ * 为什么去掉了 persist：购物车已经持久化在 MySQL 里，
+ * 再往 localStorage 存一份会出现「本地有、服务端没有」的脏数据。
  */
+import { create } from 'zustand'
+import { ApiError } from '../api/client'
+import { cartApi } from '../api/cart'
+import type { CartItemVO, CartSummaryVO, CartVO } from '../types/cart'
 
-/** 未登录时使用的演示用户 id（注册登录功能接入后由真实用户替换） */
-export const DEMO_USER_ID = 1
+const EMPTY_SUMMARY: CartSummaryVO = {
+  itemCount: 0,
+  totalQuantity: 0,
+  totalAmount: 0,
+  selectedCount: 0,
+  selectedQuantity: 0,
+  selectedAmount: 0,
+  allSelected: false,
+}
 
-/** localStorage 键名 */
-const CART_STORAGE_KEY = 'journal-bazaar:cart'
+export type CartStatus = 'idle' | 'loading' | 'ready' | 'error'
+
+interface CartState {
+  items: CartItemVO[]
+  summary: CartSummaryVO
+  status: CartStatus
+  /** 拉取失败时的可读提示（后端没启动、数据库挂了等） */
+  loadError: string | null
+  /** 是否有写操作正在提交，用于禁用按钮 */
+  mutating: boolean
+}
+
+interface CartActions {
+  /** 拉取购物车（页面挂载时调用） */
+  fetchCart: () => Promise<void>
+  addItem: (productId: number, quantity?: number) => Promise<void>
+  setQuantity: (productId: number, quantity: number) => Promise<void>
+  increaseQuantity: (productId: number, step?: number) => Promise<void>
+  decreaseQuantity: (productId: number, step?: number) => Promise<void>
+  toggleSelected: (productId: number) => Promise<void>
+  setAllSelected: (isSelected: boolean) => Promise<void>
+  removeItem: (productId: number) => Promise<void>
+  clearCart: () => Promise<void>
+}
+
+export interface CartStore extends CartState, CartActions {}
+
+function toMessage(error: unknown): string {
+  if (error instanceof ApiError) return error.message
+  return error instanceof Error ? error.message : '请求失败，请稍后重试'
+}
 
 /**
- * 本地新增行的 id：负数表示“还没同步到后端”。
- * 直接取当前最小值再减一，刷新后（persist 恢复）也不会和历史 id 撞车。
+ * 写操作串行队列。
+ * 数量增减是「读当前值再提交」，若两个请求并发，第二次会基于旧值计算（少加一次）；
+ * 排队后每个操作都能看到上一个操作的结果，行为符合直觉。
  */
-function createLocalId(items: CartItem[]): number {
-  return Math.min(0, ...items.map((item) => item.id)) - 1
+let queue: Promise<unknown> = Promise.resolve()
+
+function enqueue<T>(task: () => Promise<T>): Promise<T> {
+  const run = queue.then(task, task)
+  queue = run.then(
+    () => undefined,
+    () => undefined,
+  )
+  return run
 }
 
-/** 数量必须落在 [0, 库存] 区间内，且为整数 */
-function clampQuantity(quantity: number, stock: number): number {
-  const max = Math.max(0, Math.trunc(stock))
-  const value = Number.isFinite(quantity) ? Math.trunc(quantity) : 0
-  return Math.max(0, Math.min(value, max))
-}
+export const useCartStore = create<CartStore>()((set, get) => {
+  const applyCart = (cart: CartVO): void => {
+    set({ items: cart.items, summary: cart.summary, status: 'ready', loadError: null })
+  }
 
-function nowIso(): string {
-  return new Date().toISOString()
-}
+  const runMutation = (task: () => Promise<CartVO>): Promise<void> =>
+    enqueue(async () => {
+      set({ mutating: true })
+      try {
+        applyCart(await task())
+      } finally {
+        set({ mutating: false })
+      }
+    })
 
-export interface CartActions {
-  /** 加入购物车；同一商品重复加入会合并数量，quantity 默认 1，超出库存会被截断 */
-  addItem: (product: Product, quantity?: number) => void
-  /** 直接设置数量；设为 0 或负数等于移除 */
-  setQuantity: (productId: number, quantity: number) => void
-  increaseQuantity: (productId: number, step?: number) => void
-  decreaseQuantity: (productId: number, step?: number) => void
-  /** 移除某个商品 */
-  removeItem: (productId: number) => void
-  /** 清空购物车 */
-  clearCart: () => void
-  /** 用后端返回的数据整体覆盖（进入购物车页时调用） */
-  replaceItems: (items: CartItem[]) => void
-  /** 切换某件商品的勾选状态（对应 cart_items.is_selected） */
-  toggleSelected: (productId: number) => void
-  /** 指定勾选状态 */
-  setSelected: (productId: number, selected: boolean) => void
-  /** 全选 / 取消全选 */
-  setAllSelected: (selected: boolean) => void
-}
+  return {
+    items: [],
+    summary: EMPTY_SUMMARY,
+    status: 'idle',
+    loadError: null,
+    mutating: false,
 
-export interface CartStore extends CartActions {
-  /** 当前用户 id，对应 cart_items.user_id */
-  userId: number
-  /** 购物车条目，顺序 = 加入时间顺序 */
-  items: CartItem[]
-}
-
-export const useCartStore = create<CartStore>()(
-  persist(
-    (set, get) => ({
-      userId: DEMO_USER_ID,
-      items: [],
-
-      addItem: (product, quantity = 1) => {
-        // 售罄商品不进入购物车
-        if (product.stock <= 0) return
-        const step = Math.max(1, Math.trunc(quantity))
-
-        set((state) => {
-          const timestamp = nowIso()
-          const existing = state.items.find((item) => item.productId === product.id)
-
-          if (existing) {
-            return {
-              items: state.items.map((item) =>
-                item.productId === product.id
-                  ? {
-                      ...item,
-                      quantity: clampQuantity(item.quantity + step, product.stock),
-                      updatedAt: timestamp,
-                      // 顺带刷新快照，避免价格/库存变更后仍用旧值
-                      product,
-                      // 保留原有的勾选状态，不因为再次加购把用户去掉的勾选又打上
-                    }
-                  : item,
-              ),
-            }
-          }
-
-          const newItem: CartItem = {
-            id: createLocalId(state.items),
-            userId: state.userId,
-            productId: product.id,
-            quantity: clampQuantity(step, product.stock),
-            // 新加入的默认勾选，与数据库 is_selected DEFAULT 1 保持一致
-            isSelected: true,
-            createdAt: timestamp,
-            updatedAt: timestamp,
-            product,
-          }
-
-          return { items: [...state.items, newItem] }
-        })
-      },
-
-      setQuantity: (productId, quantity) => {
-        set((state) => ({
-          items: state.items.flatMap((item) => {
-            if (item.productId !== productId) return [item]
-            const nextQuantity = clampQuantity(quantity, item.product.stock)
-            // 数量减到 0 视为删除，与 cart_items 的删除语义保持一致
-            if (nextQuantity <= 0) return []
-            return [{ ...item, quantity: nextQuantity, updatedAt: nowIso() }]
-          }),
-        }))
-      },
-
-      increaseQuantity: (productId, step = 1) => {
-        const current = get().items.find((item) => item.productId === productId)
-        if (!current) return
-        get().setQuantity(productId, current.quantity + Math.abs(Math.trunc(step)))
-      },
-
-      decreaseQuantity: (productId, step = 1) => {
-        const current = get().items.find((item) => item.productId === productId)
-        if (!current) return
-        get().setQuantity(productId, current.quantity - Math.abs(Math.trunc(step)))
-      },
-
-      removeItem: (productId) => {
-        set((state) => ({ items: state.items.filter((item) => item.productId !== productId) }))
-      },
-
-      clearCart: () => {
-        set({ items: [] })
-      },
-
-      replaceItems: (items) => {
-        set({ items })
-      },
-
-      toggleSelected: (productId) => {
-        set((state) => ({
-          items: state.items.map((item) =>
-            item.productId === productId
-              ? { ...item, isSelected: !item.isSelected, updatedAt: nowIso() }
-              : item,
-          ),
-        }))
-      },
-
-      setSelected: (productId, selected) => {
-        set((state) => ({
-          items: state.items.map((item) =>
-            item.productId === productId && item.isSelected !== selected
-              ? { ...item, isSelected: selected, updatedAt: nowIso() }
-              : item,
-          ),
-        }))
-      },
-
-      setAllSelected: (selected) => {
-        set((state) => ({
-          items: state.items.every((item) => item.isSelected === selected)
-            ? state.items
-            : state.items.map((item) =>
-                item.isSelected === selected
-                  ? item
-                  : { ...item, isSelected: selected, updatedAt: nowIso() },
-              ),
-        }))
-      },
-    }),
-    {
-      name: CART_STORAGE_KEY,
-      version: 1,
-      // 只持久化数据，函数（actions）由 store 自身提供
-      partialize: (state) => ({ userId: state.userId, items: state.items }),
+    fetchCart: async () => {
+      set({ status: 'loading', loadError: null })
+      try {
+        applyCart(await cartApi.getCart())
+      } catch (error) {
+        set({ status: 'error', loadError: toMessage(error) })
+      }
     },
-  ),
-)
+
+    addItem: (productId, quantity = 1) =>
+      runMutation(() => cartApi.addItem(productId, quantity)),
+
+    setQuantity: (productId, quantity) =>
+      runMutation(() => cartApi.updateQuantity(productId, quantity)),
+
+    increaseQuantity: (productId, step = 1) => {
+      const current = get().items.find((item) => item.productId === productId)
+      if (!current) return Promise.resolve()
+      return runMutation(() =>
+        cartApi.updateQuantity(productId, current.quantity + Math.abs(step)),
+      )
+    },
+
+    decreaseQuantity: (productId, step = 1) => {
+      const current = get().items.find((item) => item.productId === productId)
+      // 数量减到 0 会被后端当作移除，这里与按钮禁用条件保持一致（quantity <= 1 不再减）
+      if (!current || current.quantity <= 1) return Promise.resolve()
+      return runMutation(() =>
+        cartApi.updateQuantity(productId, current.quantity - Math.abs(step)),
+      )
+    },
+
+    toggleSelected: (productId) => {
+      const current = get().items.find((item) => item.productId === productId)
+      if (!current) return Promise.resolve()
+      return runMutation(() => cartApi.updateSelected(productId, !current.isSelected))
+    },
+
+    setAllSelected: (isSelected) => runMutation(() => cartApi.updateAllSelected(isSelected)),
+
+    removeItem: (productId) => runMutation(() => cartApi.removeItem(productId)),
+
+    clearCart: () => runMutation(() => cartApi.clearCart()),
+  }
+})
 
 /* ------------------------------ 派生数据 ------------------------------ */
-/* 不放进 state，避免多一处需要同步的冗余字段；组件里按需订阅即可。      */
+/* 全部来自服务端 summary，组件订阅这些即可，不要在组件里重新累加。     */
 
-/** 金额按分四舍五入，避免 39.9 * 3 之类的浮点尾巴 */
-function roundToCents(total: number): number {
-  return Math.round(total * 100) / 100
-}
+export const selectItems = (state: CartStore): CartItemVO[] => state.items
+export const selectSummary = (state: CartStore): CartSummaryVO => state.summary
+export const selectCartStatus = (state: CartStore): CartStatus => state.status
+export const selectLoadError = (state: CartStore): string | null => state.loadError
+export const selectMutating = (state: CartStore): boolean => state.mutating
 
-/** 购物车条目数（不同商品个数） */
-export const selectItemCount = (state: CartStore): number => state.items.length
-
-/** 商品总件数（各条目数量之和），用于底部导航角标 */
-export const selectTotalQuantity = (state: CartStore): number =>
-  state.items.reduce((total, item) => total + item.quantity, 0)
-
-/** 合计金额（元）：购物车里所有商品，不区分是否勾选 */
-export const selectTotalAmount = (state: CartStore): number =>
-  roundToCents(
-    state.items.reduce((sum, item) => sum + item.product.price * item.quantity, 0),
-  )
-
-/** 已勾选的商品件数（数量之和） */
+/** 商品总件数，用于底部导航角标 */
+export const selectTotalQuantity = (state: CartStore): number => state.summary.totalQuantity
+export const selectItemCount = (state: CartStore): number => state.summary.itemCount
+export const selectTotalAmount = (state: CartStore): number => state.summary.totalAmount
+/** 已选件数 */
 export const selectSelectedQuantity = (state: CartStore): number =>
-  state.items.reduce((total, item) => (item.isSelected ? total + item.quantity : total), 0)
-
-/** 选中合计（元）：只累加已勾选的商品，用于购物车结算栏 */
-export const selectSelectedAmount = (state: CartStore): number =>
-  roundToCents(
-    state.items.reduce(
-      (sum, item) => (item.isSelected ? sum + item.product.price * item.quantity : sum),
-      0,
-    ),
-  )
-
-/** 已勾选的商品种类数 */
-export const selectSelectedCount = (state: CartStore): number =>
-  state.items.reduce((count, item) => (item.isSelected ? count + 1 : count), 0)
-
-/** 是否处于“全选”状态（购物车为空时视为未全选） */
-export const selectAllSelected = (state: CartStore): boolean =>
-  state.items.length > 0 && state.items.every((item) => item.isSelected)
-
-export const selectIsEmpty = (state: CartStore): boolean => state.items.length === 0
+  state.summary.selectedQuantity
+/** 选中合计 */
+export const selectSelectedAmount = (state: CartStore): number => state.summary.selectedAmount
+export const selectAllSelected = (state: CartStore): boolean => state.summary.allSelected
 
 /** 指定商品在购物车里的数量，0 表示未加入 */
 export const selectQuantityOf =

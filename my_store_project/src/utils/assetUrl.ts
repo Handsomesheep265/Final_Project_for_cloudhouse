@@ -36,3 +36,18 @@ export function getAsset(path: string | null | undefined): string | null {
   if (!path) return null
   return ASSET_URLS[path] ?? null
 }
+
+/**
+ * 解析图片地址，兼容两种来源：
+ *   - 后端返回的完整 URL（http(s)://、//cdn…、/uploads/…、data:）直接使用；
+ *   - 本地静态资源键（products/xxx.png）走 assets 映射，找不到时返回 null 交给占位图。
+ *
+ * 这样后端还没上对象存储、种子数据里只写了相对路径时，前端也能正常显示图片。
+ */
+export function resolveImageUrl(value: string | null | undefined): string | null {
+  if (!value) return null
+  if (/^(https?:)?\/\//i.test(value) || value.startsWith('/') || value.startsWith('data:')) {
+    return value
+  }
+  return getAsset(value)
+}

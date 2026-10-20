@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { getAsset } from '../utils/assetUrl'
+import { resolveImageUrl } from '../utils/assetUrl'
 import styles from './ProductThumb.module.css'
 
 /** 占位图配色，按商品 id 轮换，保证同一商品每次渲染配色一致 */
@@ -13,7 +13,7 @@ const FALLBACK_TONES = [
 ] as const
 
 export interface ProductThumbProps {
-  /** 相对于 src/assets 的图片路径 */
+  /** 图片地址：后端返回的 URL，或 src/assets 下的相对路径 */
   src?: string | null
   /** 图片替代文本（同时用作占位图首字） */
   alt: string
@@ -42,7 +42,7 @@ export default function ProductThumb({
   compact = false,
 }: ProductThumbProps) {
   const [failedSrc, setFailedSrc] = useState<string | null>(null)
-  const url = getAsset(src)
+  const url = resolveImageUrl(src)
   const showFallback = !url || failedSrc === url
   const classes = [styles.thumb, compact ? styles.compact : '', className]
     .filter(Boolean)

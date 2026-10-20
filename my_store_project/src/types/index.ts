@@ -1,4 +1,4 @@
-/**
+﻿/**
  * 线上手帐集市 · 前端领域类型
  * ----------------------------------------------------------------------------
  * 字段命名与 docs/DATABASE_DESIGN.md 中的表结构一一对应，只是把数据库的
@@ -78,34 +78,4 @@ export type NavKey = 'home' | 'cart' | 'profile'
 export interface ToastMessage {
   id: number
   text: string
-}
-
-/**
- * 购物车条目（cart_items 表）
- * ----------------------------------------------------------------------------
- * 前六个字段与 cart_items 一一对应（数据库 snake_case -> 前端 camelCase）。
- * 另外内嵌一份商品快照：购物车列表要显示标题、图片、单价、库存才能算总价、
- * 限制数量，这和 order_items 冗余保存 product_title / product_image /
- * unit_price 的思路一致，也避免购物车页再逐个查 products。
- */
-export interface CartItem {
-  /** cart_items.id，数据库自增；负数表示本地新增、尚未同步到后端 */
-  id: number
-  /** cart_items.user_id */
-  userId: number
-  /** cart_items.product_id */
-  productId: number
-  /** cart_items.quantity */
-  quantity: number
-  /**
-   * cart_items.is_selected：是否勾选（用于“选中合计”）
-   * 数据库里是 TINYINT 0/1，由 api 层转成 boolean 后传进来。
-   */
-  isSelected: boolean
-  /** cart_items.created_at（ISO 8601 字符串） */
-  createdAt: string
-  /** cart_items.updated_at（ISO 8601 字符串） */
-  updatedAt: string
-  /** 商品快照（来自 products / product_images） */
-  product: Product
 }

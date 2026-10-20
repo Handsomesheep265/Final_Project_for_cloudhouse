@@ -11,6 +11,7 @@
     "dev": "nodemon --watch src --ext ts,json --exec \"tsc -p tsconfig.json && node dist/index.js\"",
     "build": "tsc",
     "typecheck": "tsc --noEmit",
+    "db:init": "node src/scripts/init-db.mjs",
     "start": "node dist/index.js"
   },
   "dependencies": {
