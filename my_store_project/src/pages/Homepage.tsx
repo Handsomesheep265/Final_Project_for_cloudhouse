@@ -6,6 +6,7 @@ import BottomNavBar from '../components/BottomNavBar'
 import { CATEGORIES, PRODUCTS } from '../utils/mockData'
 import { ALL_CATEGORY_ID, applyProductFilters, pickRecommended } from '../utils/productFilters'
 import { useCartStore, selectTotalQuantity } from '../stores/cartStore'
+import { selectFavoriteIds, useFavoritesStore } from '../stores/favoritesStore'
 import { ApiError } from '../api/client'
 import { useTheme } from '../utils/useTheme'
 import type { Product, SortKey, ToastMessage } from '../types'
@@ -36,10 +37,20 @@ export default function Homepage() {
   const fetchCart = useCartStore((state) => state.fetchCart)
   const cartTotalQuantity = useCartStore(selectTotalQuantity)
 
+  // 收藏（与个人主页共用同一份数据）：首页只关心「哪些商品已收藏」
+  const favoriteIds = useFavoritesStore(selectFavoriteIds)
+  const toggleFavorite = useFavoritesStore((state) => state.toggle)
+  const refreshFavorites = useFavoritesStore((state) => state.refresh)
+
   // 进入首页时拉一次购物车，用于底部角标（失败也不阻塞首页）
   useEffect(() => {
     void fetchCart()
   }, [fetchCart])
+
+  // 收藏同理：拉不到就当作全未收藏，爱心按未选中展示
+  useEffect(() => {
+    void refreshFavorites()
+  }, [refreshFavorites])
 
   // 顶部导航栏
   const [keyword, setKeyword] = useState('')
@@ -50,7 +61,6 @@ export default function Homepage() {
   const [onlyInStock, setOnlyInStock] = useState(false)
 
   // 交互状态
-  const [favoriteIds, setFavoriteIds] = useState<ReadonlySet<number>>(() => new Set([3, 5]))
   const [recommendOffset, setRecommendOffset] = useState(0)
   const [toast, setToast] = useState<ToastMessage | null>(null)
 
@@ -76,14 +86,22 @@ export default function Homepage() {
       ? null
       : (CATEGORIES.find((category) => category.id === activeCategoryId)?.name ?? null)
 
-  const handleToggleFavorite = useCallback((productId: number) => {
-    setFavoriteIds((current) => {
-      const next = new Set(current)
-      if (next.has(productId)) next.delete(productId)
-      else next.add(productId)
-      return next
-    })
-  }, [])
+  // 收藏走真实接口（与个人主页共用状态）：失败时给出后端文案
+  const handleToggleFavorite = useCallback(
+    (productId: number) => {
+      void (async () => {
+        try {
+          await toggleFavorite(productId)
+        } catch (error) {
+          setToast({
+            id: Date.now(),
+            text: error instanceof ApiError ? error.message : '收藏失败，请稍后重试',
+          })
+        }
+      })()
+    },
+    [toggleFavorite],
+  )
 
   // 加购走真实接口：成功/失败都用同一处 toast 反馈（例如库存不足时显示后端文案）
   const handleAddToCart = useCallback(

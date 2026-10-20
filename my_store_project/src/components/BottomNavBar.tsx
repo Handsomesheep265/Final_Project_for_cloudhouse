@@ -13,8 +13,8 @@ interface BaseNavItem {
 }
 
 /**
- * 已实现的页面用 to 走 React Router 跳转；
- * 尚未实现的入口（个人主页）继续用 href 做占位，等页面做出来后改成 to 即可。
+ * 三个入口都已实现，全部走 React Router 跳转；
+ * NavItem 保留了 href 这一支，方便以后接入外部链接（如帮助中心）。
  */
 type NavItem = BaseNavItem &
   ({ to: RoutePath; href?: never } | { href: string; to?: never })
@@ -26,7 +26,7 @@ type NavItem = BaseNavItem &
 const NAV_ITEMS: NavItem[] = [
   { key: 'home', label: '首页', icon: HomeIcon, to: ROUTES.home },
   { key: 'cart', label: '购物车', icon: CartIcon, to: ROUTES.cart },
-  { key: 'profile', label: '个人主页', icon: UserIcon, href: '#profile' },
+  { key: 'profile', label: '个人主页', icon: UserIcon, to: ROUTES.profile },
 ]
 
 export interface BottomNavBarProps {

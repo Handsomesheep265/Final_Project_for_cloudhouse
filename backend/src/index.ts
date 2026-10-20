@@ -18,6 +18,7 @@ import { closePool, pingDatabase } from './config/database'
 import { errorHandler } from './middlewares/errorHandler'
 import { cartRouter } from './routes/cartRoutes'
 import { orderRouter } from './routes/orderRoutes'
+import { profileRouter } from './routes/profileRoutes'
 import type { ApiResponse } from './types/common'
 
 /** 优雅退出最长等待时间，超时就强制结束，避免进程挂死 */
@@ -71,6 +72,7 @@ export function createApp(): Express {
   // 业务路由
   app.use('/api/cart', cartRouter)
   app.use('/api/orders', orderRouter)
+  app.use('/api/profile', profileRouter)
 
   // 未匹配到任何路由
   app.use((_req, res) => {
@@ -108,6 +110,9 @@ async function bootstrap(): Promise<void> {
     console.log('              GET  /api/orders（我的订单）')
     console.log('              GET  /api/orders/:orderNo（详情）')
     console.log('              POST /api/orders/:orderNo/cancel | /pay')
+    console.log('   个人主页   GET  /api/profile（资料 + 统计）')
+    console.log('              PATCH /api/profile（改昵称/头像/简介）')
+    console.log('              GET  /api/profile/favorites（收藏）、/products（我的商品）')
   })
 
   server.on('error', (error: NodeJS.ErrnoException) => {

@@ -12,6 +12,8 @@ export const ROUTES = {
   checkout: '/checkout',
   /** 我的订单（列表） */
   orders: '/orders',
+  /** 个人主页 */
+  profile: '/profile',
 } as const
 
 /** 已实现页面的路径类型 */
