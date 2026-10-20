@@ -1,8 +1,12 @@
 # 线上手帐集市 - 数据库设计文档
 
-> 仓库里提供了可直接执行的脚本：`backend/src/sql/schema.sql`（建表）与 `backend/src/sql/seed.sql`（种子数据），
-> 或在 `backend/` 下运行 `npm run db:init`（读取 `backend/.env` 的数据库配置，库不存在时会自动创建）。
+> 仓库里提供了可直接执行的脚本（都在 `backend/src/sql/`）：
+> `schema.sql`（用户 / 商品 / 购物车 / 评价 / 收藏）、`orders.sql`（订单 / 订单明细 / 支付）、`seed.sql`（种子数据）。
+> 或在 `backend/` 下运行 `npm run db:init`（读取 `backend/.env`，库不存在时自动创建，两个建表脚本会按顺序执行）。
 > 脚本与本文档保持一致，后续改表结构请同步更新两边。
+
+> 为什么订单和购物车在同一个库：下单要在同一个事务里「写 orders + 写 order_items + 清空 cart_items 里已勾选的行」，
+> 同库才能保证三件事要么全成功要么全回滚，也才能直接 JOIN 校验。
 
 
 ## 一、模块划分
@@ -188,9 +192,16 @@ CREATE TABLE orders (
     receiver_phone VARCHAR(20),
     receiver_address VARCHAR(300),
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_order_no (order_no),
+    KEY idx_orders_user_created (user_id, created_at),
+    KEY idx_orders_status (status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 ```
+
+> 注：`backend/src/sql/orders.sql` 里把唯一约束显式命名为 `uk_order_no`，
+> 并用 `idx_orders_user_created(user_id, created_at)` 支撑「我的订单」按时间倒序分页
+> （复合索引前缀即 `user_id`，不需要再单独建 `idx_orders_user`），另加 `idx_orders_status` 便于按状态筛选。
 
 | 字段 | 类型 | 说明 |
 |---|---|---|
@@ -218,9 +229,13 @@ CREATE TABLE order_items (
     product_image VARCHAR(500),
     quantity INT NOT NULL,
     unit_price DECIMAL(10,2) NOT NULL,
-    subtotal DECIMAL(10,2) NOT NULL
+    subtotal DECIMAL(10,2) NOT NULL,
+    KEY idx_order_items_order (order_id),
+    KEY idx_order_items_product (product_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 ```
+
+> 注：`idx_order_items_order` 用于「按订单查明细」，`idx_order_items_product` 用于商品维度的统计/评价关联。
 
 | 字段 | 类型 | 说明 |
 |---|---|---|
@@ -244,7 +259,9 @@ CREATE TABLE payments (
     pay_no VARCHAR(64) NOT NULL UNIQUE,
     amount DECIMAL(10,2) NOT NULL,
     status VARCHAR(20) NOT NULL DEFAULT 'PENDING',
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_pay_no (pay_no),
+    KEY idx_payments_order (order_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 ```
 

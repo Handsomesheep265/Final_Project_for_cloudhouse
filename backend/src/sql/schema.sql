@@ -1,15 +1,19 @@
 -- ============================================================================
--- 线上手帐集市 · 表结构（MySQL 8.0）
+-- 线上手帐集市 · 表结构（MySQL 8.0）—— 用户 / 商品 / 购物车 / 评价 / 收藏
 -- 与 docs/DATABASE_DESIGN.md 保持一致，并补上了购物车相关修正：
 --   * cart_items 增加 is_selected（勾选状态）与 uk_user_product 唯一索引
 --   * favorites 的 uk_user_product 保留（设计文档里已有）
 --
+-- 订单模块（orders / order_items / payments）已拆分到同目录的 orders.sql，
+-- 因为下单要和 cart_items 处于同一个事务，但按模块维护更清楚。
+--
 -- 用法（在空库上执行，可重复执行，不会删数据）：
---   mysql -u root -p cart_items < sql/schema.sql
---   或 npm run db:init  （会一起执行种子数据）
+--   mysql -u root -p shopping_cart < src/sql/schema.sql
+--   mysql -u root -p shopping_cart < src/sql/orders.sql
+--   或 npm run db:init  （会按顺序执行两个建表脚本 + 种子数据）
 --
 -- 说明：设计文档没有加外键约束，这里保持一致，由应用层保证引用完整性。
---       额外补了几个查询索引（积分/封面图/关联查询会用到），不改变表结构语义。
+--       额外补了几个查询索引（封面图/关联查询会用到），不改变表结构语义。
 -- ============================================================================
 
 SET NAMES utf8mb4;
@@ -84,53 +88,6 @@ CREATE TABLE IF NOT EXISTS cart_items (
     created_at  DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at  DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     UNIQUE KEY uk_user_product (user_id, product_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
--- ---------------------------------------------------------------------------
--- 订单
--- ---------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS orders (
-    id               BIGINT AUTO_INCREMENT PRIMARY KEY,
-    order_no         VARCHAR(64) NOT NULL UNIQUE,
-    user_id          BIGINT NOT NULL,
-    total_amount     DECIMAL(10, 2) NOT NULL,
-    status           VARCHAR(20) NOT NULL DEFAULT 'CREATED'
-                     COMMENT 'CREATED/PAYED/SHIPPED/COMPLETED/CANCELED',
-    receiver_name    VARCHAR(50),
-    receiver_phone   VARCHAR(20),
-    receiver_address VARCHAR(300),
-    created_at       DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at       DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    KEY idx_orders_user (user_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
--- ---------------------------------------------------------------------------
--- 订单明细（保存下单时的商品快照，商品改价不影响历史订单）
--- ---------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS order_items (
-    id            BIGINT AUTO_INCREMENT PRIMARY KEY,
-    order_id      BIGINT NOT NULL,
-    product_id    BIGINT NOT NULL,
-    product_title VARCHAR(200) NOT NULL,
-    product_image VARCHAR(500),
-    quantity      INT NOT NULL,
-    unit_price    DECIMAL(10, 2) NOT NULL,
-    subtotal      DECIMAL(10, 2) NOT NULL,
-    KEY idx_order_items_order (order_id),
-    KEY idx_order_items_product (product_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
--- ---------------------------------------------------------------------------
--- 支付流水
--- ---------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS payments (
-    id         BIGINT AUTO_INCREMENT PRIMARY KEY,
-    order_id   BIGINT NOT NULL,
-    pay_no     VARCHAR(64) NOT NULL UNIQUE,
-    amount     DECIMAL(10, 2) NOT NULL,
-    status     VARCHAR(20) NOT NULL DEFAULT 'PENDING' COMMENT 'PENDING/SUCCESS/FAILED',
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    KEY idx_payments_order (order_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ---------------------------------------------------------------------------

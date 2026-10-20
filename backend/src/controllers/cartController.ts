@@ -7,12 +7,13 @@
  *   3. 用统一响应体 { code, message, data } 返回。
  *
  * 业务规则一律不写在这里：校验/拦截由 service 抛 CartError，
- * 错误响应由 cartRoutes.ts 里的错误中间件统一转换。
+ * 错误响应由 src/middlewares/errorHandler.ts 统一转换。
  *
  * 说明：Express 5 会自动把 async handler 的 reject 交给错误中间件，
  * 所以这里不需要 try/catch 或 asyncHandler 包装。
  */
 import type { Request, RequestHandler, Response } from 'express'
+import type { AuthenticatedRequest } from '../middlewares/auth'
 import { CART_ERRORS, CartError, cartService, CartService } from '../services/cartService'
 import type {
   AddCartItemDTO,
@@ -22,22 +23,17 @@ import type {
 } from '../types/cart.dto'
 import type { ApiResponse } from '../types/common'
 
-/**
- * 挂上 userId 的请求。
- * userId 只能由鉴权中间件从 token 解析后写入，绝不从请求体读取，
- * 否则客户端可以伪造成别人的用户操作其购物车。
- */
-export interface AuthenticatedRequest extends Request {
-  userId?: number
-}
-
 /** 统一成功响应 */
 function sendSuccess<T>(res: Response, data: T, status = 200): void {
   const body: ApiResponse<T> = { code: 0, message: 'ok', data }
   res.status(status).json(body)
 }
 
-/** 取当前登录用户；缺失或非法时按业务错误抛出 */
+/**
+ * 取当前登录用户；缺失或非法时按业务错误抛出。
+ * userId 只能由鉴权中间件（src/middlewares/auth.ts）写入，绝不从请求体读取，
+ * 否则客户端可以伪造成别人的用户操作其购物车。
+ */
 function requireUserId(req: Request): number {
   const { userId } = req as AuthenticatedRequest
   if (typeof userId !== 'number' || !Number.isInteger(userId) || userId <= 0) {

@@ -43,7 +43,19 @@ if (!/^[A-Za-z0-9_]+$/.test(DB_NAME)) {
   process.exit(1)
 }
 
-const TABLES = ['users', 'categories', 'products', 'product_images', 'cart_items']
+const TABLES = [
+  'users',
+  'categories',
+  'products',
+  'product_images',
+  'cart_items',
+  'orders',
+  'order_items',
+  'payments',
+]
+
+/** 建表脚本按模块拆分，执行顺序固定；都使用 CREATE TABLE IF NOT EXISTS，可重复执行 */
+const SCHEMA_FILES = ['schema.sql', 'orders.sql']
 
 const baseConfig = {
   host: DB_HOST,
@@ -80,7 +92,9 @@ async function runSqlFile(fileName) {
 }
 
 try {
-  await runSqlFile('schema.sql')
+  for (const file of SCHEMA_FILES) {
+    await runSqlFile(file)
+  }
 
   const [productRows] = await connection.query('SELECT COUNT(*) AS count FROM products')
   const productCount = Number(productRows[0].count)

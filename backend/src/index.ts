@@ -15,7 +15,9 @@ import type { Server } from 'node:http'
 import cors from 'cors'
 import { env } from './config/env'
 import { closePool, pingDatabase } from './config/database'
-import { cartErrorHandler, cartRouter } from './routes/cartRoutes'
+import { errorHandler } from './middlewares/errorHandler'
+import { cartRouter } from './routes/cartRoutes'
+import { orderRouter } from './routes/orderRoutes'
 import type { ApiResponse } from './types/common'
 
 /** 优雅退出最长等待时间，超时就强制结束，避免进程挂死 */
@@ -68,6 +70,7 @@ export function createApp(): Express {
 
   // 业务路由
   app.use('/api/cart', cartRouter)
+  app.use('/api/orders', orderRouter)
 
   // 未匹配到任何路由
   app.use((_req, res) => {
@@ -76,7 +79,7 @@ export function createApp(): Express {
   })
 
   // 错误中间件：必须最后注册
-  app.use(cartErrorHandler)
+  app.use(errorHandler)
 
   return app
 }
@@ -101,6 +104,10 @@ async function bootstrap(): Promise<void> {
     console.log('   购物车接口 GET  /api/cart')
     console.log('              POST /api/cart/items')
     console.log('              PATCH/DELETE /api/cart/...')
+    console.log('   订单接口   POST /api/orders（结算下单）')
+    console.log('              GET  /api/orders（我的订单）')
+    console.log('              GET  /api/orders/:orderNo（详情）')
+    console.log('              POST /api/orders/:orderNo/cancel | /pay')
   })
 
   server.on('error', (error: NodeJS.ErrnoException) => {

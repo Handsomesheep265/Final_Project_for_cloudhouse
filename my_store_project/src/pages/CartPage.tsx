@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import BottomNavBar from '../components/BottomNavBar'
 import ProductThumb from '../components/ProductThumb'
 import SellerBadge from '../components/SellerBadge'
@@ -36,9 +36,11 @@ const NOTE_DURATION = 2400
  * 数据全部来自后端 /api/cart（见 src/api/cart.ts + src/stores/cartStore.ts）：
  *   - 条目、勾选状态、小计、合计、选中合计都由服务端返回，前端只负责渲染；
  *   - 数量增减 / 勾选 / 删除 都会重新拉取整车数据，金额不会出现两边不一致。
- * 结算流程还要接 orders / payments 接口，目前点击只给出提示。
+ * 「去结算」跳到 /checkout（确认订单页），真正下单由那边的 POST /api/orders 完成。
  */
 export default function CartPage() {
+  const navigate = useNavigate()
+
   const items = useCartStore(selectItems)
   const status = useCartStore(selectCartStatus)
   const loadError = useCartStore(selectLoadError)
@@ -88,7 +90,7 @@ export default function CartPage() {
 
   const handleCheckout = () => {
     if (selectedQuantity === 0) return
-    setNote({ text: '结算流程待接入订单接口（orders / payments）', tone: 'info' })
+    navigate(ROUTES.checkout)
   }
 
   const isLoading = status === 'loading' && items.length === 0
@@ -152,6 +154,9 @@ export default function CartPage() {
         {!isEmpty && !isLoading && status !== 'error' && (
           <>
             <div className={styles.toolbar}>
+              <Link className={styles.ghostBtn} to={ROUTES.orders}>
+                我的订单
+              </Link>
               <button
                 type="button"
                 className={styles.ghostBtn}
