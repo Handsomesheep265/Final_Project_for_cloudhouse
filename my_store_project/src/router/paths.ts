@@ -16,6 +16,8 @@ export const ROUTES = {
   profile: '/profile',
   /** 商品详情（列表前缀，实际地址用 productPath() 拼） */
   products: '/products',
+  /** 搜索结果页（?keyword= 由页面自己写进 URL） */
+  search: '/search',
 } as const
 
 /** 已实现页面的路径类型 */

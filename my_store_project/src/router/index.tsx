@@ -6,6 +6,7 @@ import OrdersPage from '../pages/OrdersPage'
 import OrderDetailPage from '../pages/OrderDetailPage'
 import ProductDetailPage from '../pages/ProductDetailPage'
 import ProfilePage from '../pages/ProfilePage'
+import SearchPage from '../pages/SearchPage'
 import { ROUTES } from './paths'
 
 /**
@@ -18,6 +19,7 @@ import { ROUTES } from './paths'
  * - `/orders/:orderNo` 订单详情（链接统一用 paths.ts 的 orderDetailPath 生成）
  * - `/profile`       个人主页（资料 + 收藏 + 我发布的商品）
  * - `/products/:productId` 商品详情（链接统一用 paths.ts 的 productPath 生成）
+ * - `/search?keyword=手帐` 搜索结果（商品 + 店铺）
  * - `*`              尚未实现的地址统一回首页，避免直接输入 /profile 之类路径时出现空白页
  *
  * 后续接入更多页面（个人主页、商品详情等）时，在这里追加即可；
@@ -51,6 +53,10 @@ export const router = createBrowserRouter([
   {
     path: `${ROUTES.products}/:productId`,
     element: <ProductDetailPage />,
+  },
+  {
+    path: ROUTES.search,
+    element: <SearchPage />,
   },
   {
     path: '*',

@@ -10,6 +10,12 @@ export interface SearchNavBarProps {
   onCategoryChange: (categoryId: number) => void
   keyword: string
   onKeywordChange: (keyword: string) => void
+  /**
+   * 提交搜索（回车或点「搜索」）。
+   * 不传时只阻止表单默认跳转——首页现在的行为是「输入即筛列表」，
+   * 传了之后回车/点按钮会跳到搜索结果页做真实搜索。
+   */
+  onSearchSubmit?: (keyword: string) => void
   theme: Theme
   onToggleTheme: () => void
 }
@@ -18,8 +24,9 @@ export interface SearchNavBarProps {
  * 顶部搜索导航栏
  * ----------------------------------------------------------------------------
  * 承载 README 首页要求的三件事：商品分类入口、商品搜索入口、风格切换。
- * 分类与搜索都是受控组件，状态由 src/pages/Homepage.tsx 统一管理，
- * 筛选结果实时作用在下方商品列表上。
+ * 分类与搜索都是受控组件，状态由 src/pages/Homepage.tsx 统一管理：
+ *   - 输入过程中首页列表即时筛选（本地 mock 数据）；
+ *   - 回车 / 点「搜索」交给 onSearchSubmit，跳到 /search 搜真实数据。
  */
 export default function SearchNavBar({
   categories,
@@ -27,12 +34,13 @@ export default function SearchNavBar({
   onCategoryChange,
   keyword,
   onKeywordChange,
+  onSearchSubmit,
   theme,
   onToggleTheme,
 }: SearchNavBarProps) {
-  // 筛选是即时的，提交时只需阻止表单默认跳转（同时收起移动端键盘）
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
+    onSearchSubmit?.(keyword.trim())
   }
 
   return (

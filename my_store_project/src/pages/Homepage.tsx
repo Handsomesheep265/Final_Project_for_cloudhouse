@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import SearchNavBar from '../components/SearchNavBar'
 import RecommendSection from '../components/RecommendSection'
 import ProductListSection from '../components/ProductListSection'
@@ -9,6 +10,7 @@ import { useCartStore, selectTotalQuantity } from '../stores/cartStore'
 import { selectFavoriteIds, useFavoritesStore } from '../stores/favoritesStore'
 import { ApiError } from '../api/client'
 import { useTheme } from '../utils/useTheme'
+import { ROUTES } from '../router/paths'
 import type { Product, SortKey, ToastMessage } from '../types'
 import styles from './Homepage.module.css'
 
@@ -31,6 +33,7 @@ const DEFAULT_SORT: SortKey = 'default'
  */
 export default function Homepage() {
   const { theme, toggleTheme } = useTheme()
+  const navigate = useNavigate()
 
   // 购物车（Zustand + 后端接口）：角标订阅服务端汇总的件数
   const addToCart = useCartStore((state) => state.addItem)
@@ -121,6 +124,17 @@ export default function Homepage() {
     [addToCart],
   )
 
+  // 回车 / 点「搜索」进入搜索结果页（无刷新跳转，列表数据走 /api/search）
+  const handleSearchSubmit = useCallback(
+    (nextKeyword: string) => {
+      const trimmed = nextKeyword.trim()
+      navigate(
+        trimmed ? `${ROUTES.search}?keyword=${encodeURIComponent(trimmed)}` : ROUTES.search,
+      )
+    },
+    [navigate],
+  )
+
   const handleClearFilters = useCallback(() => {
     setKeyword('')
     setActiveCategoryId(ALL_CATEGORY_ID)
@@ -147,6 +161,7 @@ export default function Homepage() {
         onCategoryChange={setActiveCategoryId}
         keyword={keyword}
         onKeywordChange={setKeyword}
+        onSearchSubmit={handleSearchSubmit}
         theme={theme}
         onToggleTheme={toggleTheme}
       />

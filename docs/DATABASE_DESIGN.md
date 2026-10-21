@@ -1,8 +1,8 @@
 # 线上手帐集市 - 数据库设计文档
 
 > 仓库里提供了可直接执行的脚本（都在 `backend/src/sql/`）：
-> `schema.sql`（用户 / 商品 / 购物车 / 评价 / 收藏）、`orders.sql`（订单 / 订单明细 / 支付）、`seed.sql`（种子数据）。
-> 或在 `backend/` 下运行 `npm run db:init`（读取 `backend/.env`，库不存在时自动创建，两个建表脚本会按顺序执行）。
+> `schema.sql`（用户 / 商品 / 购物车 / 评价 / 收藏）、`orders.sql`（订单 / 订单明细 / 支付）、`search-index.sql`（商品名 + 昵称的 ngram 全文索引）、`seed.sql`（种子数据）。
+> 或在 `backend/` 下运行 `npm run db:init`（读取 `backend/.env`，库不存在时自动创建，三个脚本按 schema → orders → search-index 的顺序执行）。
 > 脚本与本文档保持一致，后续改表结构请同步更新两边。
 
 > 为什么订单和购物车在同一个库：下单要在同一个事务里「写 orders + 写 order_items + 清空 cart_items 里已勾选的行」，
@@ -322,6 +322,28 @@ CREATE TABLE favorites (
 | created_at | DATETIME | 收藏时间 |
 
 > 注：`(user_id, product_id)` 设置了唯一索引，防止重复收藏。
+
+### 3.11 全文索引（首页搜索用）
+
+首页搜索框要同时搜「商品名」和「店铺名」，这两个字段都是中文。MySQL 默认的全文解析器按空格/标点切词，一整串中文会被当成一个词，几乎搜不到东西，所以两张表的全文索引都指定了 `ngram` 解析器（MySQL 5.7+ 内置，8.0 默认 ACTIVE），按 `ngram_token_size`（默认 2）切成二元组。
+
+```sql
+ALTER TABLE products ADD FULLTEXT KEY ft_products_title (title) WITH PARSER ngram;
+ALTER TABLE users    ADD FULLTEXT KEY ft_users_nickname (nickname) WITH PARSER ngram;
+```
+
+| 表 | 索引 | 字段 | 用途 |
+|---|---|---|---|
+| products | `ft_products_title` | title | 商品名搜索 |
+| users | `ft_users_nickname` | nickname | 店铺 / 用户搜索 |
+
+> 注 1：脚本在 `backend/src/sql/search-index.sql`，由 `npm run db:init` 在 `schema.sql`、`orders.sql` 之后执行。MySQL 不支持 `ADD FULLTEXT IF NOT EXISTS`，脚本里先查 `information_schema.statistics`，已存在就跳过，可重复执行。
+>
+> 注 2：查询用 `MATCH(title) AGAINST(? IN BOOLEAN MODE)`，`EXPLAIN` 的 `type=fulltext`、`key=ft_products_title`；`MATCH` 的分数可直接用于「相关度排序」。
+>
+> 注 3：`ngram_token_size=2` 时单字查询（如「纸」）不会命中，所以搜索接口至少要 2 个字符，service 层负责校验；短语搜索用双引号（`"手帐本"`）。
+>
+> 注 4：`description` 是长文本，后续如果想让描述也参与搜索，再给它单独加 `ft_products_description` 即可（不必改现有索引）。
 
 ## 四、表关系说明
 
