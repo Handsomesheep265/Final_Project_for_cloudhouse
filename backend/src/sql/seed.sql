@@ -12,15 +12,17 @@ SET NAMES utf8mb4;
 
 -- ---------------------------------------------------------------------------
 -- 卖家（id 1~6，对应商品表的 seller_id）
--- 密码哈希为占位值：登录/注册功能尚未实现，接入 BCrypt 后请重新生成
+-- 密码哈希：scrypt（Node 内置 crypto，实现见 src/utils/password.ts）
+-- 6 个演示账号的密码统一为 123456 —— 仅本地演示用，真实项目绝不能这样
+-- 旧库不会重跑本文件；已有数据想重置演示密码请执行 npm run db:passwords
 -- ---------------------------------------------------------------------------
 INSERT INTO users (id, nickname, avatar_url, email, password_hash, bio, status) VALUES
-(1, '纸间手作',   'avatars/avatar-1.png', 'seller1@example.com', '$2a$10$dXJ3SW6G7P50lGmMkkmwe.20cQQubK3.HZWzG3YB1tlRy.fqvM/BG', '做能写很久的纸', 1),
-(2, '小满贴纸铺', 'avatars/avatar-2.png', 'seller2@example.com', '$2a$10$dXJ3SW6G7P50lGmMkkmwe.20cQQubK3.HZWzG3YB1tlRy.fqvM/BG', '和纸贴纸专门店', 1),
-(3, '卷卷胶带研究所', 'avatars/avatar-3.png', 'seller3@example.com', '$2a$10$dXJ3SW6G7P50lGmMkkmwe.20cQQubK3.HZWzG3YB1tlRy.fqvM/BG', '低饱和配色爱好者', 1),
-(4, '木木印章工房', 'avatars/avatar-4.png', 'seller4@example.com', '$2a$10$dXJ3SW6G7P50lGmMkkmwe.20cQQubK3.HZWzG3YB1tlRy.fqvM/BG', '手刻木质印章', 1),
-(5, '一笔一画文具', 'avatars/avatar-5.png', 'seller5@example.com', '$2a$10$dXJ3SW6G7P50lGmMkkmwe.20cQQubK3.HZWzG3YB1tlRy.fqvM/BG', '笔类选品', 1),
-(6, '电子手帐研究所', 'avatars/avatar-6.png', 'seller6@example.com', '$2a$10$dXJ3SW6G7P50lGmMkkmwe.20cQQubK3.HZWzG3YB1tlRy.fqvM/BG', 'GoodNotes 模板', 1);
+(1, '纸间手作',   'avatars/avatar-1.png', 'seller1@example.com', 'scrypt$16384$8$1$146cc9e81792e9a2756722c4ff96f6d9$1edda41536ee7c30a7242c9aab33221e750819dffea2daa909bbdcc96e7690e3f87bc923e6d793421d149bce1fc3e4194f56f3ec8b5e0c79f53c07967a099e95', '做能写很久的纸', 1),
+(2, '小满贴纸铺', 'avatars/avatar-2.png', 'seller2@example.com', 'scrypt$16384$8$1$2eac9621ea669425049d49723df2b409$5c8e2a4a4357c6a11234a4b4986f94614a73d622667960f896bb599879cc28d276d3a8e225f5ee6a3722f31472abd735a2132ece227c300f50431c1badeb69da', '和纸贴纸专门店', 1),
+(3, '卷卷胶带研究所', 'avatars/avatar-3.png', 'seller3@example.com', 'scrypt$16384$8$1$b9063830dc9d26f21734d5960dc3311e$4b897dcd6824459dd75001a27e9df51b118235e5cdf099adeec01d46947d75a3ed1658264e3e0bfd2f905fbca4d080d6d334b56595cef59d1d8a48bf9f83bbff', '低饱和配色爱好者', 1),
+(4, '木木印章工房', 'avatars/avatar-4.png', 'seller4@example.com', 'scrypt$16384$8$1$ce83947bd43f6820749f810b5be7d6aa$f2034d13b11f2807c7b8ab35c218bacc79bfd7130e0f67c6d1d6d61e7bbd75653a51104761cc6747f667510cd24db4dad7773479d1867a916f86acf86c43ddc5', '手刻木质印章', 1),
+(5, '一笔一画文具', 'avatars/avatar-5.png', 'seller5@example.com', 'scrypt$16384$8$1$731aadd0abedb35803b094a5b7a21df7$c375fc213c2e2e0458512c6cddbf6733d11ae74a437869c0bfefbe24310564cdf138c7e98393f42bf75c795d671c541841d2ade949a9d27ed9f6d3146610afe8', '笔类选品', 1),
+(6, '电子手帐研究所', 'avatars/avatar-6.png', 'seller6@example.com', 'scrypt$16384$8$1$bc2d958099a49482811d67b940a06c75$a3ec8025924b12687d0a03ed8789a6667c8bfdea18146ae5552a12f70143656420ef9300e0dcdd89cbceb27b64a39867cc92d36b74d2c084764361b4611a113f', 'GoodNotes 模板', 1);
 
 -- ---------------------------------------------------------------------------
 -- 分类

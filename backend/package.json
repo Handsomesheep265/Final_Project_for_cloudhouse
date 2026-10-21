@@ -12,6 +12,7 @@
     "build": "tsc",
     "typecheck": "tsc --noEmit",
     "db:init": "node src/scripts/init-db.mjs",
+    "db:passwords": "tsc -p tsconfig.json && node dist/scripts/reset-demo-passwords.js",
     "start": "node dist/index.js"
   },
   "dependencies": {

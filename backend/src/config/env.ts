@@ -38,6 +38,15 @@ function readInt(key: string, fallback: number): number {
   return parsed
 }
 
+function readBool(key: string, fallback: boolean): boolean {
+  const raw = process.env[key]
+  if (raw === undefined || raw === '') return fallback
+  const normalized = raw.trim().toLowerCase()
+  if (['1', 'true', 'yes', 'on'].includes(normalized)) return true
+  if (['0', 'false', 'no', 'off'].includes(normalized)) return false
+  throw new Error(`环境变量 ${key} 必须是 true / false，当前值：${raw}`)
+}
+
 export interface DatabaseEnv {
   host: string
   port: number
@@ -45,6 +54,15 @@ export interface DatabaseEnv {
   password: string
   database: string
   poolSize: number
+}
+
+export interface AuthEnv {
+  /** JWT 签名密钥（HS256），生产环境必须显式配置 */
+  jwtSecret: string
+  /** 登录凭证有效期（秒） */
+  tokenTtlSeconds: number
+  /** 是否允许用 x-user-id 请求头冒充登录用户（仅本地联调，生产强制关闭） */
+  allowDemoHeader: boolean
 }
 
 export interface AppEnv {
@@ -55,15 +73,41 @@ export interface AppEnv {
   /** 允许的跨域来源；null 表示不限制（开发环境默认） */
   corsOrigin: string | null
   db: DatabaseEnv
+  auth: AuthEnv
 }
 
 const nodeEnv = readString('NODE_ENV', 'development')
+const isProduction = nodeEnv === 'production'
+
+/** 开发环境的默认密钥：只在本地用，生产环境没配 JWT_SECRET 会直接启动失败 */
+const DEV_JWT_SECRET = 'journal-bazaar-dev-only-secret-change-me'
+const MIN_JWT_SECRET_LENGTH = 32
+
+function readJwtSecret(): string {
+  if (!isProduction) {
+    return readString('JWT_SECRET', DEV_JWT_SECRET)
+  }
+  const secret = readRequiredString('JWT_SECRET')
+  if (secret.length < MIN_JWT_SECRET_LENGTH) {
+    throw new Error(
+      `生产环境的 JWT_SECRET 至少需要 ${MIN_JWT_SECRET_LENGTH} 个字符，建议用 openssl rand -base64 48 生成`,
+    )
+  }
+  return secret
+}
 
 export const env: AppEnv = {
   nodeEnv,
-  isProduction: nodeEnv === 'production',
+  isProduction,
   port: readInt('PORT', 3000),
   corsOrigin: readString('CORS_ORIGIN', '') || null,
+  auth: {
+    jwtSecret: readJwtSecret(),
+    // 默认 7 天：课程项目不做刷新 token，过期就重新登录
+    tokenTtlSeconds: readInt('AUTH_TOKEN_TTL_HOURS', 168) * 3600,
+    // 生产环境一律关闭占位鉴权，避免任何人改个请求头就变成别人
+    allowDemoHeader: readBool('AUTH_DEMO_HEADER', !isProduction),
+  },
   db: {
     host: readString('DB_HOST', '127.0.0.1'),
     port: readInt('DB_PORT', 3306),

@@ -16,6 +16,7 @@ import cors from 'cors'
 import { env } from './config/env'
 import { closePool, pingDatabase } from './config/database'
 import { errorHandler } from './middlewares/errorHandler'
+import { authRouter } from './routes/authRoutes'
 import { cartRouter } from './routes/cartRoutes'
 import { categoryRouter } from './routes/categoryRoutes'
 import { orderRouter } from './routes/orderRoutes'
@@ -73,6 +74,7 @@ export function createApp(): Express {
   })
 
   // 业务路由
+  app.use('/api/auth', authRouter)
   app.use('/api/categories', categoryRouter)
   app.use('/api/search', searchRouter)
   app.use('/api/products', productRouter)
@@ -109,6 +111,10 @@ async function bootstrap(): Promise<void> {
   const server = app.listen(env.port, () => {
     console.log(`🚀 手帐集市后端已启动：http://127.0.0.1:${env.port}（${env.nodeEnv}）`)
     console.log('   健康检查   GET  /health')
+    console.log('   认证接口   POST /api/auth/register（注册，直接返回登录凭证）')
+    console.log('              POST /api/auth/login（登录）')
+    console.log('              GET  /api/auth/me（当前用户，带 Authorization: Bearer <token>）')
+    console.log(`   鉴权方式   Authorization: Bearer <token>${env.auth.allowDemoHeader ? '（开发期仍兼容 x-user-id 请求头）' : ''}`)
     console.log('   搜索接口   GET  /api/search?keyword=手帐&type=all')
     console.log('   分类接口   GET  /api/categories')
     console.log('   商品接口   GET  /api/products/:productId（详情）')
