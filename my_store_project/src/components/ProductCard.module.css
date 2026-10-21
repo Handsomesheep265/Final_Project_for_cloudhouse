@@ -24,6 +24,18 @@
   position: relative;
 }
 
+/* 覆盖整张图的点击区（跳商品详情）；按钮通过更高的 z-index 盖在它上面 */
+.mediaLink {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  border-radius: inherit;
+}
+
+.mediaLink:focus-visible {
+  outline-offset: -3px;
+}
+
 .media img {
   transition: transform 600ms var(--ease);
 }
@@ -36,6 +48,7 @@
   position: absolute;
   top: 10px;
   left: 10px;
+  z-index: 2;
   max-width: calc(100% - 56px);
   overflow: hidden;
   padding: 3px 9px;
@@ -50,6 +63,8 @@
   color: var(--text);
   white-space: nowrap;
   text-overflow: ellipsis;
+  /* 角标只是装饰，别挡住下面的详情链接 */
+  pointer-events: none;
 }
 
 .badgeWarn {
@@ -62,6 +77,7 @@
   position: absolute;
   top: 8px;
   right: 8px;
+  z-index: 2;
   display: grid;
   place-items: center;
   width: 28px;
@@ -90,6 +106,7 @@
 .soldOut {
   position: absolute;
   inset: 0;
+  z-index: 1;
   display: grid;
   place-items: center;
   background: rgba(12, 10, 8, 0.42);
@@ -99,6 +116,8 @@
   font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.22em;
+  /* 售罄遮罩不影响点击（点上去仍进详情） */
+  pointer-events: none;
 }
 
 /* ------------------------------ 信息区 ------------------------------ */
@@ -120,6 +139,16 @@
   font-weight: 600;
   line-height: 1.45;
   color: var(--text);
+}
+
+/* 标题也可点进详情 */
+.titleLink {
+  color: inherit;
+  transition: color var(--transition);
+}
+
+.titleLink:hover {
+  color: var(--accent-strong);
 }
 
 .desc {

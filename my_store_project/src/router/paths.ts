@@ -14,6 +14,8 @@ export const ROUTES = {
   orders: '/orders',
   /** 个人主页 */
   profile: '/profile',
+  /** 商品详情（列表前缀，实际地址用 productPath() 拼） */
+  products: '/products',
 } as const
 
 /** 已实现页面的路径类型 */
@@ -25,4 +27,12 @@ export type RoutePath = (typeof ROUTES)[keyof typeof ROUTES]
  */
 export function orderDetailPath(orderNo: string): string {
   return `${ROUTES.orders}/${encodeURIComponent(orderNo)}`
+}
+
+/**
+ * 商品详情链接。
+ * 首页卡片、推荐位、购物车行、相关推荐都用它，避免各处手写模板串。
+ */
+export function productPath(productId: number): string {
+  return `${ROUTES.products}/${encodeURIComponent(String(productId))}`
 }

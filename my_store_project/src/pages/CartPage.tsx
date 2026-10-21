@@ -24,7 +24,7 @@ import {
 } from '../stores/cartStore'
 import { ApiError } from '../api/client'
 import { formatPrice } from '../utils/format'
-import { ROUTES } from '../router/paths'
+import { ROUTES, productPath } from '../router/paths'
 import styles from './CartPage.module.css'
 
 /** 操作提示浮层的停留时间 */
@@ -183,18 +183,26 @@ export default function CartPage() {
                     </span>
                   </label>
 
-                  <div className={styles.thumbWrap}>
+                  <Link
+                    className={styles.thumbWrap}
+                    to={productPath(item.productId)}
+                    aria-label={`查看 ${item.product.title} 详情`}
+                  >
                     <ProductThumb
                       src={item.product.imageUrl}
                       alt={item.product.title}
                       seed={item.productId}
                       compact
                     />
-                  </div>
+                  </Link>
 
                   <div className={styles.info}>
                     <div className={styles.infoTop}>
-                      <h2 className={styles.itemTitle}>{item.product.title}</h2>
+                      <h2 className={styles.itemTitle}>
+                        <Link className={styles.itemLink} to={productPath(item.productId)}>
+                          {item.product.title}
+                        </Link>
+                      </h2>
                       <button
                         type="button"
                         className={styles.remove}

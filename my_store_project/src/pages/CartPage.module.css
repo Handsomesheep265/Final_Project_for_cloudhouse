@@ -156,6 +156,7 @@
 }
 
 .thumbWrap {
+  display: block;
   flex: none;
   width: 72px;
   overflow: hidden;
@@ -185,6 +186,16 @@
   font-weight: 600;
   line-height: 1.4;
   color: var(--text);
+}
+
+/* 标题可点进商品详情 */
+.itemLink {
+  color: inherit;
+  transition: color var(--transition);
+}
+
+.itemLink:hover {
+  color: var(--accent-strong);
 }
 
 .remove {

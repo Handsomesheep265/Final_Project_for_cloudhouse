@@ -1,8 +1,10 @@
+import { Link } from 'react-router-dom'
 import type { Product } from '../types'
 import ProductThumb from './ProductThumb'
 import SellerBadge from './SellerBadge'
 import { HeartIcon, StarIcon } from './Icons'
 import { formatPrice } from '../utils/format'
+import { productPath } from '../router/paths'
 import styles from './RecommendCard.module.css'
 
 export interface RecommendCardProps {
@@ -36,6 +38,14 @@ export default function RecommendCard({
           seed={product.id}
           priority={featured}
         />
+
+        {/* 覆盖图片的点击区：点图进商品详情，爱心按钮层级更高 */}
+        <Link
+          className={styles.mediaLink}
+          to={productPath(product.id)}
+          aria-label={`查看 ${product.title} 详情`}
+        />
+
         <span
           className={featured ? `${styles.ribbon} ${styles.ribbonFeatured}` : styles.ribbon}
         >
@@ -54,7 +64,11 @@ export default function RecommendCard({
 
       <div className={styles.body}>
         <span className={styles.category}>{product.categoryName}</span>
-        <h3 className={styles.title}>{product.title}</h3>
+        <h3 className={styles.title}>
+          <Link className={styles.titleLink} to={productPath(product.id)}>
+            {product.title}
+          </Link>
+        </h3>
         <p className={styles.desc}>{product.description}</p>
 
         <div className={styles.meta}>

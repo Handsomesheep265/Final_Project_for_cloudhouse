@@ -1,8 +1,10 @@
+import { Link } from 'react-router-dom'
 import type { Product } from '../types'
 import ProductThumb from './ProductThumb'
 import SellerBadge from './SellerBadge'
 import { HeartIcon, PlusIcon, StarIcon } from './Icons'
 import { formatCount, formatPrice } from '../utils/format'
+import { productPath } from '../router/paths'
 import styles from './ProductCard.module.css'
 
 /** 库存低于该值时提示“仅剩 N 件” */
@@ -34,6 +36,13 @@ export default function ProductCard({
       <div className={styles.media}>
         <ProductThumb src={product.image} alt={product.title} seed={product.id} />
 
+        {/* 覆盖整张图的点击区，点图进商品详情；爱心/加购按钮用更高层级盖在它上面 */}
+        <Link
+          className={styles.mediaLink}
+          to={productPath(product.id)}
+          aria-label={`查看 ${product.title} 详情`}
+        />
+
         {badge !== undefined && (
           <span className={isLowStock ? `${styles.badge} ${styles.badgeWarn}` : styles.badge}>
             {badge}
@@ -54,7 +63,11 @@ export default function ProductCard({
       </div>
 
       <div className={styles.body}>
-        <h3 className={styles.title}>{product.title}</h3>
+        <h3 className={styles.title}>
+          <Link className={styles.titleLink} to={productPath(product.id)}>
+            {product.title}
+          </Link>
+        </h3>
         <p className={styles.desc}>{product.description}</p>
 
         <div className={styles.meta}>
