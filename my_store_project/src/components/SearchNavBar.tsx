@@ -16,6 +16,9 @@ export interface SearchNavBarProps {
    * 传了之后回车/点按钮会跳到搜索结果页做真实搜索。
    */
   onSearchSubmit?: (keyword: string) => void
+  /** 分类接口失败：导航里显示重试入口，而不是静默只剩「全部」 */
+  categoriesFailed?: boolean
+  onRetryCategories?: () => void
   theme: Theme
   onToggleTheme: () => void
 }
@@ -25,8 +28,10 @@ export interface SearchNavBarProps {
  * ----------------------------------------------------------------------------
  * 承载 README 首页要求的三件事：商品分类入口、商品搜索入口、风格切换。
  * 分类与搜索都是受控组件，状态由 src/pages/Homepage.tsx 统一管理：
- *   - 输入过程中首页列表即时筛选（本地 mock 数据）；
+ *   - 分类来自 GET /api/categories，点击只切换筛选条件（列表由首页重新拉取）；
+ *   - 输入过程中首页列表即时筛选已拉取的数据；
  *   - 回车 / 点「搜索」交给 onSearchSubmit，跳到 /search 搜真实数据。
+ * 分类接口失败时导航里会出现「分类加载失败 · 重试」，避免点了没反应像“死按钮”。
  */
 export default function SearchNavBar({
   categories,
@@ -35,6 +40,8 @@ export default function SearchNavBar({
   keyword,
   onKeywordChange,
   onSearchSubmit,
+  categoriesFailed = false,
+  onRetryCategories,
   theme,
   onToggleTheme,
 }: SearchNavBarProps) {
@@ -71,6 +78,17 @@ export default function SearchNavBar({
               </button>
             )
           })}
+
+          {categoriesFailed && onRetryCategories && (
+            <button
+              type="button"
+              className={styles.chipRetry}
+              onClick={onRetryCategories}
+              title="分类接口请求失败，点击重新加载"
+            >
+              分类加载失败 · 重试
+            </button>
+          )}
         </nav>
 
         <form className={styles.search} role="search" onSubmit={handleSubmit}>

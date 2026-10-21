@@ -1,7 +1,7 @@
 import type { ApiResponse } from '../types/cart'
 
 /** 后端地址：默认本地 3000，可用 .env 里的 VITE_API_BASE 覆盖 */
-const API_BASE = (import.meta.env.VITE_API_BASE ?? 'http://127.0.0.1:3000').replace(/\/+$/, '')
+export const API_BASE = (import.meta.env.VITE_API_BASE ?? 'http://127.0.0.1:3000').replace(/\/+$/, '')
 
 /**
  * 临时鉴权占位：与后端 cartRoutes.ts 的 x-user-id 方案对应。

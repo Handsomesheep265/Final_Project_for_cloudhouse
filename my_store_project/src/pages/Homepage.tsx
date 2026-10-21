@@ -70,6 +70,7 @@ export default function Homepage() {
 
   // 分类（接口驱动）与商品列表（接口驱动）
   const [categories, setCategories] = useState<Category[]>([ALL_CATEGORY])
+  const [categoriesFailed, setCategoriesFailed] = useState(false)
   const [productTotal, setProductTotal] = useState(0)
   const [products, setProducts] = useState<Product[]>([])
   const [listStatus, setListStatus] = useState<'loading' | 'ready' | 'error'>('loading')
@@ -92,9 +93,12 @@ export default function Homepage() {
       const result = await categoryApi.list()
       setCategories([ALL_CATEGORY, ...result.list.map(toNavCategory)])
       setProductTotal(result.productTotal)
-    } catch {
-      // 分类拉不到就只留「全部」，商品列表仍可用
+      setCategoriesFailed(false)
+    } catch (error) {
+      // 失败不能静默：导航栏会显示「分类加载失败 · 重试」，控制台也留一条可读原因
+      console.warn('[categories] 分类接口加载失败，导航栏会显示重试入口：', error)
       setCategories([ALL_CATEGORY])
+      setCategoriesFailed(true)
     }
   }, [])
 
@@ -119,6 +123,7 @@ export default function Homepage() {
     } catch (error) {
       if (token !== listToken.current) return
 
+      console.warn(`[products] 商品列表加载失败（categoryId=${categoryId}）：`, error)
       setListError(error instanceof ApiError ? error.message : '商品加载失败，请稍后重试')
       setListStatus('error')
     }
@@ -216,6 +221,32 @@ export default function Homepage() {
     [navigate],
   )
 
+  /**
+   * 滚到商品列表区域。
+   * 首页顶部是介绍卡 + 推荐位，列表在首屏下方；点分类后如果停在原地，
+   * 用户看不到任何反馈（只有 chip 变了），很容易以为「按键坏了」。
+   * 所以切换分类后主动把列表滚到视口里（扣掉吸顶导航的高度）。
+   */
+  const scrollToProductList = useCallback(() => {
+    const title = document.getElementById('product-list-title')
+    if (!title) return
+
+    const header = document.querySelector('nav[aria-label="商品分类"]')?.closest('header')
+    const headerHeight =
+      header instanceof HTMLElement ? header.getBoundingClientRect().height : 0
+    const top = title.getBoundingClientRect().top + window.scrollY - headerHeight - 12
+    window.scrollTo({ top: Math.max(top, 0), behavior: 'smooth' })
+  }, [])
+
+  /** 点分类：切筛选条件 + 滚到列表，让用户立刻看到结果 */
+  const handleCategoryChange = useCallback(
+    (categoryId: number) => {
+      setActiveCategoryId(categoryId)
+      window.requestAnimationFrame(scrollToProductList)
+    },
+    [scrollToProductList],
+  )
+
   const handleClearFilters = useCallback(() => {
     setKeyword('')
     setActiveCategoryId(ALL_CATEGORY_ID)
@@ -239,7 +270,9 @@ export default function Homepage() {
       <SearchNavBar
         categories={categories}
         activeCategoryId={activeCategoryId}
-        onCategoryChange={setActiveCategoryId}
+        onCategoryChange={handleCategoryChange}
+        categoriesFailed={categoriesFailed}
+        onRetryCategories={() => void loadCategories()}
         keyword={keyword}
         onKeywordChange={setKeyword}
         onSearchSubmit={handleSearchSubmit}

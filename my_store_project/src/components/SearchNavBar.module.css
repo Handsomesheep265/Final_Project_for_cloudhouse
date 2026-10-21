@@ -113,6 +113,27 @@
   border-color: transparent;
 }
 
+/* 分类接口失败时的重试 chip：用危险色 + 虚线，和正常分类明显区分 */
+.chipRetry {
+  flex: none;
+  padding: 7px 14px;
+  border: 1px dashed color-mix(in srgb, var(--danger) 55%, transparent);
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--danger) 8%, transparent);
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--danger);
+  white-space: nowrap;
+  transition:
+    background-color var(--transition),
+    border-color var(--transition);
+}
+
+.chipRetry:hover {
+  border-color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 14%, transparent);
+}
+
 /* ------------------------------ 搜索 ------------------------------ */
 
 .search {
