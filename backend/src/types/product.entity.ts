@@ -82,3 +82,30 @@ export interface ProductMetaEntity {
   categoryId: number
   categoryName: string
 }
+
+/**
+ * 商品列表行（首页列表 + 分类筛选）
+ * ----------------------------------------------------------------------------
+ * 除了商品本身，还带卖家、分类名、封面，以及两个「派生指标」：
+ *   - rating：reviews 表的平均分（没有评价时为 0）
+ *   - sales ：order_items 里累计卖出的件数（没有成交时为 0）
+ * 数据库里没有这两列，是查询时用子查询算出来的，排序和卡片展示都用它。
+ */
+export interface ProductListEntity {
+  id: number
+  title: string
+  description: string | null
+  price: number
+  stock: number
+  /** 1 上架（列表只返回上架商品） */
+  status: number
+  imageUrl: string | null
+  sellerId: number
+  sellerName: string
+  sellerAvatarUrl: string | null
+  categoryId: number
+  categoryName: string
+  rating: number
+  sales: number
+  createdAt: Date
+}

@@ -13,9 +13,34 @@ import { pool } from '../config/database'
 import type {
   ProductDetailEntity,
   ProductImageEntity,
+  ProductListEntity,
   ProductMetaEntity,
   RelatedProductEntity,
 } from '../types/product.entity'
+
+/* ============================== 常量 ============================== */
+
+/** 列表排序方式（service 负责校验，这里负责映射成 ORDER BY） */
+export type ProductSort = 'default' | 'price-asc' | 'price-desc' | 'sales' | 'rating'
+
+export const PRODUCT_SORTS: readonly ProductSort[] = [
+  'default',
+  'price-asc',
+  'price-desc',
+  'sales',
+  'rating',
+]
+
+/** 列表筛选条件 */
+export interface ProductListFilters {
+  /** 分类 id；null 表示全部 */
+  categoryId: number | null
+  /** 只看有货（stock > 0） */
+  onlyInStock: boolean
+  sort: ProductSort
+  limit: number
+  offset: number
+}
 
 /* ============================== SQL ============================== */
 
@@ -108,7 +133,87 @@ const SELECT_RELATED = `
   ORDER BY (p.stock > 0) DESC, p.created_at DESC, p.id DESC
 `
 
+/**
+ * 商品列表（首页 / 分类筛选）。
+ * ------------------------------------------------------------------
+ * rating 与 sales 是派生指标：products 表没有这两列，
+ * 用 reviews 平均分、order_items 累计件数现算，排序和卡片角标都用它。
+ * WHERE 里的分类 / 有货条件、ORDER BY、LIMIT 由 buildListWhere + 排序表拼接，
+ * 拼接进去的只有 service 校验过的枚举与整数，没有用户原样字符串。
+ */
+const SELECT_LIST = `
+  SELECT
+    p.id            AS id,
+    p.title         AS title,
+    p.description   AS description,
+    p.price         AS price,
+    p.stock         AS stock,
+    p.status        AS status,
+    p.seller_id     AS seller_id,
+    p.category_id   AS category_id,
+    p.created_at    AS created_at,
+    u.nickname      AS seller_name,
+    u.avatar_url    AS seller_avatar_url,
+    c.name          AS category_name,
+    (
+      SELECT pi.image_url FROM product_images pi
+      WHERE pi.product_id = p.id
+      ORDER BY pi.sort_order ASC, pi.id ASC
+      LIMIT 1
+    )               AS image_url,
+    (
+      SELECT COALESCE(AVG(r.rating), 0) FROM reviews r WHERE r.product_id = p.id
+    )               AS rating,
+    (
+      SELECT COALESCE(SUM(oi.quantity), 0)
+      FROM order_items oi
+      INNER JOIN orders o ON o.id = oi.order_id
+      WHERE oi.product_id = p.id AND o.status <> 'CANCELED'
+    )               AS sales
+  FROM products p
+  INNER JOIN users u      ON u.id = p.seller_id
+  INNER JOIN categories c ON c.id = p.category_id
+  WHERE p.status = 1
+`
+
+const COUNT_LIST = `
+  SELECT COUNT(*) AS total
+  FROM products p
+  WHERE p.status = 1
+`
+
+/** 列表排序方式 → ORDER BY（别名可直接用于 ORDER BY） */
+const LIST_ORDER_BY: Record<ProductSort, string> = {
+  default: 'p.created_at DESC, p.id DESC',
+  'price-asc': 'p.price ASC, p.id ASC',
+  'price-desc': 'p.price DESC, p.id ASC',
+  sales: 'sales DESC, p.id ASC',
+  rating: 'rating DESC, p.id ASC',
+}
+
 /* ============================ 行类型与映射 ============================ */
+
+interface ProductListRow extends RowDataPacket {
+  id: number
+  title: string
+  description: string | null
+  price: number | string
+  stock: number
+  status: number
+  seller_id: number
+  category_id: number
+  created_at: Date | string
+  seller_name: string | null
+  seller_avatar_url: string | null
+  category_name: string
+  image_url: string | null
+  rating: number | string
+  sales: number | string
+}
+
+interface CountRow extends RowDataPacket {
+  total: number | string
+}
 
 interface ProductDetailRow extends RowDataPacket {
   id: number
@@ -211,6 +316,49 @@ function mapRelatedRow(row: RelatedProductRow): RelatedProductEntity {
   }
 }
 
+function mapListRow(row: ProductListRow): ProductListEntity {
+  return {
+    id: row.id,
+    title: row.title,
+    description: row.description,
+    price: toNumber(row.price),
+    stock: row.stock,
+    status: row.status,
+    imageUrl: row.image_url,
+    sellerId: row.seller_id,
+    sellerName: row.seller_name ?? '匿名手作人',
+    sellerAvatarUrl: row.seller_avatar_url,
+    categoryId: row.category_id,
+    categoryName: row.category_name,
+    rating: toNumber(row.rating),
+    sales: toNumber(row.sales),
+    createdAt: toDate(row.created_at),
+  }
+}
+
+/**
+ * 拼 WHERE 片段（分类 / 有货）。
+ * 返回的字符串只包含 `AND xxx = ?` 与 `AND p.stock > 0`，
+ * 参数走占位符，不会有注入。
+ */
+function buildListWhere(filters: Pick<ProductListFilters, 'categoryId' | 'onlyInStock'>): {
+  where: string
+  params: number[]
+} {
+  const conditions: string[] = []
+  const params: number[] = []
+
+  if (filters.categoryId !== null) {
+    conditions.push('p.category_id = ?')
+    params.push(filters.categoryId)
+  }
+  if (filters.onlyInStock) {
+    conditions.push('p.stock > 0')
+  }
+
+  return { where: conditions.map((condition) => ` AND ${condition}`).join(''), params }
+}
+
 /* ============================== 仓储实现 ============================== */
 
 export class ProductRepository {
@@ -252,6 +400,28 @@ export class ProductRepository {
       [categoryId, excludeProductId],
     )
     return rows.map(mapRelatedRow)
+  }
+
+  /**
+   * 商品列表（分类筛选 + 排序 + 分页）。
+   * LIMIT / OFFSET / ORDER BY 都是 service 校验过的枚举与整数，直接拼接。
+   */
+  async findList(filters: ProductListFilters): Promise<ProductListEntity[]> {
+    const { where, params } = buildListWhere(filters)
+    const [rows] = await this.db.execute<ProductListRow[]>(
+      `${SELECT_LIST}${where} ORDER BY ${LIST_ORDER_BY[filters.sort]} LIMIT ${filters.limit} OFFSET ${filters.offset}`,
+      params,
+    )
+    return rows.map(mapListRow)
+  }
+
+  /** 列表命中总数（配合分页器 / 「共 N 件」提示） */
+  async countList(
+    filters: Pick<ProductListFilters, 'categoryId' | 'onlyInStock'>,
+  ): Promise<number> {
+    const { where, params } = buildListWhere(filters)
+    const [rows] = await this.db.execute<CountRow[]>(`${COUNT_LIST}${where}`, params)
+    return toNumber(rows[0]?.total ?? 0)
   }
 }
 

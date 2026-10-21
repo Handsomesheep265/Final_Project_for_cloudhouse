@@ -8,10 +8,12 @@
   -webkit-backdrop-filter: blur(20px) saturate(180%);
 }
 
-/* 支持 color-mix 的浏览器使用半透明背景，滚动时带毛玻璃效果 */
+/* 支持 color-mix 的浏览器使用半透明背景，滚动时带毛玻璃效果。
+   透明度不能太低：滚动时下面的商品卡会从导航栏透出来（毛玻璃没生效的浏览器尤其明显），
+   这里保留 94% 底色 + 模糊，兼顾观感与可读性 */
 @supports (background: color-mix(in srgb, red 50%, transparent)) {
   .nav {
-    background: color-mix(in srgb, var(--bg) 86%, transparent);
+    background: color-mix(in srgb, var(--bg) 94%, transparent);
   }
 }
 

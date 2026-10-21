@@ -90,3 +90,44 @@ export interface RelatedProductListVO {
   categoryId: number
   categoryName: string
 }
+
+/**
+ * 商品列表项（首页列表 / 分类筛选）
+ * ----------------------------------------------------------------------------
+ * 字段按「卡片需要什么就给什么」：
+ *   - 卡片渲染：title / price / coverImage / stock / sellerName
+ *   - 排序与角标：rating（评价均分）、sales（累计销量）
+ *   - 分类筛选：categoryId / categoryName
+ */
+export interface ProductListItemVO {
+  id: number
+  title: string
+  description: string | null
+  price: number
+  /** 库存，0 表示售罄 */
+  stock: number
+  /** 1 上架（列表只会返回上架商品） */
+  status: number
+  coverImage: string | null
+  sellerId: number
+  sellerName: string
+  sellerAvatarUrl: string | null
+  categoryId: number
+  categoryName: string
+  /** 评价平均分（两位小数），没有评价为 0 */
+  rating: number
+  /** 累计销量（order_items 数量之和），没有成交为 0 */
+  sales: number
+  /** 上架时间（ISO 8601） */
+  createdAt: string
+}
+
+/** GET /api/products */
+export interface ProductListVO {
+  list: ProductListItemVO[]
+  total: number
+  page: number
+  pageSize: number
+  /** 实际筛选的分类 id；null 表示「全部」 */
+  categoryId: number | null
+}

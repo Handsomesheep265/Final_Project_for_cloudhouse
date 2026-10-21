@@ -1,25 +1,34 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import SearchNavBar from '../components/SearchNavBar'
 import RecommendSection from '../components/RecommendSection'
 import ProductListSection from '../components/ProductListSection'
 import BottomNavBar from '../components/BottomNavBar'
-import { CATEGORIES, PRODUCTS } from '../utils/mockData'
 import { ALL_CATEGORY_ID, applyProductFilters, pickRecommended } from '../utils/productFilters'
+import { toNavCategory, toProductCard } from '../utils/productAdapter'
 import { useCartStore, selectTotalQuantity } from '../stores/cartStore'
 import { selectFavoriteIds, useFavoritesStore } from '../stores/favoritesStore'
 import { ApiError } from '../api/client'
+import { categoryApi } from '../api/category'
+import { productApi } from '../api/product'
 import { useTheme } from '../utils/useTheme'
 import { ROUTES } from '../router/paths'
-import type { Product, SortKey, ToastMessage } from '../types'
+import type { Category, Product, SortKey, ToastMessage } from '../types'
 import styles from './Homepage.module.css'
 
 /** 推荐位一次展示的商品数量 */
 const RECOMMEND_LIMIT = 4
+/** 推荐位候选池大小：够「换一批」轮换两轮 */
+const RECOMMEND_POOL_SIZE = 8
+/** 每个分类一次拉多少商品（当前数据量小，一次拉完；数据变多时再改成分页/加载更多） */
+const PRODUCT_PAGE_SIZE = 50
 /** 提示浮层自动消失时间（毫秒） */
 const TOAST_DURATION = 2200
 /** 默认排序方式 */
 const DEFAULT_SORT: SortKey = 'default'
+
+/** 导航栏第一项「全部」是前端聚合出来的，不落库 */
+const ALL_CATEGORY: Category = { id: ALL_CATEGORY_ID, name: '全部', parentId: 0, sortOrder: 0 }
 
 /**
  * 首页
@@ -59,6 +68,16 @@ export default function Homepage() {
   const [keyword, setKeyword] = useState('')
   const [activeCategoryId, setActiveCategoryId] = useState<number>(ALL_CATEGORY_ID)
 
+  // 分类（接口驱动）与商品列表（接口驱动）
+  const [categories, setCategories] = useState<Category[]>([ALL_CATEGORY])
+  const [productTotal, setProductTotal] = useState(0)
+  const [products, setProducts] = useState<Product[]>([])
+  const [listStatus, setListStatus] = useState<'loading' | 'ready' | 'error'>('loading')
+  const [listError, setListError] = useState<string | null>(null)
+  const [recommendPool, setRecommendPool] = useState<Product[]>([])
+  /** 列表请求序号：切分类很快时，先发的旧响应回来会被丢弃 */
+  const listToken = useRef(0)
+
   // 商品列表
   const [sortBy, setSortBy] = useState<SortKey>(DEFAULT_SORT)
   const [onlyInStock, setOnlyInStock] = useState(false)
@@ -67,27 +86,89 @@ export default function Homepage() {
   const [recommendOffset, setRecommendOffset] = useState(0)
   const [toast, setToast] = useState<ToastMessage | null>(null)
 
+  /** 拉分类：接口里的分类 + 前端聚合的「全部」 */
+  const loadCategories = useCallback(async () => {
+    try {
+      const result = await categoryApi.list()
+      setCategories([ALL_CATEGORY, ...result.list.map(toNavCategory)])
+      setProductTotal(result.productTotal)
+    } catch {
+      // 分类拉不到就只留「全部」，商品列表仍可用
+      setCategories([ALL_CATEGORY])
+    }
+  }, [])
+
+  /**
+   * 按分类拉商品；切换分类时重新请求，不刷新页面。
+   * categoryId = 0（全部）时不传分类参数。
+   */
+  const loadProducts = useCallback(async (categoryId: number) => {
+    const token = ++listToken.current
+    setListStatus('loading')
+    setListError(null)
+
+    try {
+      const result = await productApi.list({
+        categoryId: categoryId === ALL_CATEGORY_ID ? undefined : categoryId,
+        pageSize: PRODUCT_PAGE_SIZE,
+      })
+      if (token !== listToken.current) return
+
+      setProducts(result.list.map(toProductCard))
+      setListStatus('ready')
+    } catch (error) {
+      if (token !== listToken.current) return
+
+      setListError(error instanceof ApiError ? error.message : '商品加载失败，请稍后重试')
+      setListStatus('error')
+    }
+  }, [])
+
+  /** 推荐位候选池：按销量取前 N 件，「换一批」在本地轮换，不再打接口 */
+  const loadRecommendPool = useCallback(async () => {
+    try {
+      const result = await productApi.list({ sort: 'sales', pageSize: RECOMMEND_POOL_SIZE })
+      setRecommendPool(result.list.map((item) => ({ ...toProductCard(item), isRecommended: true })))
+    } catch {
+      setRecommendPool([])
+    }
+  }, [])
+
+  useEffect(() => {
+    // 数据拉取型 effect：分类与推荐位只在进入首页时各拉一次
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void loadCategories()
+    void loadRecommendPool()
+  }, [loadCategories, loadRecommendPool])
+
+  useEffect(() => {
+    // 分类变化 → 重新拉列表（无刷新换列表）；setState 都在 await 之后
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void loadProducts(activeCategoryId)
+  }, [activeCategoryId, loadProducts])
+
+  // 在服务端已按分类筛选的结果上，继续做「关键词 / 只看有货 / 排序」的即时筛选
   const visibleProducts = useMemo<Product[]>(
     () =>
-      applyProductFilters(PRODUCTS, {
+      applyProductFilters(products, {
         keyword,
         categoryId: activeCategoryId,
         sortBy,
         onlyInStock,
       }),
-    [keyword, activeCategoryId, sortBy, onlyInStock],
+    [products, keyword, activeCategoryId, sortBy, onlyInStock],
   )
 
   // 推荐位不受搜索/筛选影响，避免筛选结果为空时整块区域一起消失
   const recommendedProducts = useMemo<Product[]>(
-    () => pickRecommended(PRODUCTS, { limit: RECOMMEND_LIMIT, offset: recommendOffset }),
-    [recommendOffset],
+    () => pickRecommended(recommendPool, { limit: RECOMMEND_LIMIT, offset: recommendOffset }),
+    [recommendPool, recommendOffset],
   )
 
   const activeCategoryName =
     activeCategoryId === ALL_CATEGORY_ID
       ? null
-      : (CATEGORIES.find((category) => category.id === activeCategoryId)?.name ?? null)
+      : (categories.find((category) => category.id === activeCategoryId)?.name ?? null)
 
   // 收藏走真实接口（与个人主页共用状态）：失败时给出后端文案
   const handleToggleFavorite = useCallback(
@@ -156,7 +237,7 @@ export default function Homepage() {
   return (
     <div className={styles.page} id="top">
       <SearchNavBar
-        categories={CATEGORIES}
+        categories={categories}
         activeCategoryId={activeCategoryId}
         onCategoryChange={setActiveCategoryId}
         keyword={keyword}
@@ -200,7 +281,7 @@ export default function Homepage() {
 
         <ProductListSection
           products={visibleProducts}
-          totalCount={PRODUCTS.length}
+          totalCount={productTotal > 0 ? productTotal : visibleProducts.length}
           keyword={keyword}
           activeCategoryName={activeCategoryName}
           sortBy={sortBy}
@@ -211,12 +292,15 @@ export default function Homepage() {
           favoriteIds={favoriteIds}
           onToggleFavorite={handleToggleFavorite}
           onAddToCart={handleAddToCart}
+          loading={listStatus === 'loading'}
+          error={listError}
+          onRetry={() => void loadProducts(activeCategoryId)}
         />
 
         <footer className={styles.footer}>
           <p className={styles.footerBrand}>手帐集市 · Journal Bazaar</p>
           <p className={styles.footerNote}>
-            当前为开发阶段演示数据，正式商品数据将由 Spring Boot 接口提供
+            商品与分类数据来自后端接口（/api/products、/api/categories），点击分类即可按类别筛选
           </p>
         </footer>
       </main>

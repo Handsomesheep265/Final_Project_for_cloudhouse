@@ -2,23 +2,31 @@
  * 商品服务层（Service）
  * ----------------------------------------------------------------------------
  * 职责：
- *   1. 校验商品 ID / limit；
+ *   1. 校验商品 ID / limit / 列表筛选参数；
  *   2. 拼装详情 VO：商品 + 全部图片 + 卖家 + 分类 + 评价统计 + 收藏/购物车状态；
- *   3. 相关推荐：同分类、在售、排除自己；
- *   4. 决定「下架 / 售罄」怎么表达 —— 详情照常返回（用户点进来要能看到原因），
+ *   3. 商品列表：按分类筛选（categoryId）、只看有货、排序、分页；
+ *   4. 相关推荐：同分类、在售、排除自己；
+ *   5. 决定「下架 / 售罄」怎么表达 —— 详情照常返回（用户点进来要能看到原因），
  *      由 statusText + stock 让前端决定按钮是否可用；只有商品真的不存在才 404。
  *
  * 不负责：SQL 与行映射（repositories）、HTTP 状态码与响应包装（controllers）。
  *
- * 注意：详情是公开接口，userId 允许为 null（未登录访客），
- * 此时 isFavorite=false、cartQuantity=0，不影响其余字段。
+ * 注意：详情与列表都是公开接口，userId 允许为 null（未登录访客）。
  */
-import { productRepository, ProductRepository } from '../repositories/productRepositories'
-import type { RelatedProductQueryDTO } from '../types/product.dto'
-import type { ProductDetailEntity, ProductImageEntity, RelatedProductEntity } from '../types/product.entity'
+import { PRODUCT_SORTS, productRepository, ProductRepository } from '../repositories/productRepositories'
+import type { ProductSort } from '../repositories/productRepositories'
+import type { ProductListQueryDTO, RelatedProductQueryDTO } from '../types/product.dto'
+import type {
+  ProductDetailEntity,
+  ProductImageEntity,
+  ProductListEntity,
+  RelatedProductEntity,
+} from '../types/product.entity'
 import type {
   ProductDetailVO,
   ProductImageVO,
+  ProductListItemVO,
+  ProductListVO,
   RelatedProductListVO,
   RelatedProductVO,
 } from '../types/product.vo'
@@ -26,12 +34,15 @@ import type {
 /* ============================== 业务错误 ============================== */
 
 /**
- * 错误码继续往后排，避免和购物车 / 订单 / 个人主页冲突：
+ * 错误码继续往后排，避免和购物车 / 订单 / 个人主页 / 搜索冲突：
  *   400xx 参数问题   404xx 资源不存在
  */
 const PRODUCT_ERROR_SPECS = {
   invalidProductId: { code: 40011, httpStatus: 400, message: '商品 ID 不合法' },
   invalidLimit: { code: 40012, httpStatus: 400, message: '相关推荐条数不合法' },
+  invalidCategoryId: { code: 40016, httpStatus: 400, message: '分类 ID 不合法' },
+  invalidSort: { code: 40017, httpStatus: 400, message: '排序方式不合法' },
+  invalidQuery: { code: 40018, httpStatus: 400, message: '分页参数不合法' },
   productNotFound: { code: 40407, httpStatus: 404, message: '商品不存在或已删除' },
 } as const
 
@@ -58,11 +69,18 @@ export const PRODUCT_ERRORS = PRODUCT_ERROR_SPECS
 const DEFAULT_RELATED_LIMIT = 6
 const MAX_RELATED_LIMIT = 12
 
+const DEFAULT_PAGE = 1
+const DEFAULT_PAGE_SIZE = 12
+const MAX_PAGE_SIZE = 50
+
 /** 状态文案：详情页顶部的角标直接用 */
 const STATUS_TEXT: Record<number, string> = {
   1: '在售',
   0: '已下架',
 }
+
+/** 「只看有货」的真值写法，其余（含不传）都按 false */
+const TRUTHY_FLAGS = new Set(['1', 'true', 'yes', 'on'])
 
 function isPositiveInteger(value: unknown): value is number {
   return typeof value === 'number' && Number.isInteger(value) && value > 0
@@ -91,6 +109,69 @@ function parseLimit(raw: string | undefined): number {
     )
   }
   return parsed
+}
+
+/**
+ * 分类 id：不传 / 空 / 0 都表示「全部」（返回 null），
+ * 其余必须是正整数，否则 40016。
+ */
+function parseCategoryId(raw: string | undefined): number | null {
+  if (raw === undefined || raw === '') return null
+
+  const parsed = Number(raw)
+  if (!Number.isInteger(parsed) || parsed < 0) {
+    throw new ProductError(PRODUCT_ERROR_SPECS.invalidCategoryId, `分类 ID 不合法：${raw}`)
+  }
+  return parsed === 0 ? null : parsed
+}
+
+/** 只看有货：1 / true / yes / on 为真 */
+function parseOnlyInStock(raw: string | undefined): boolean {
+  if (raw === undefined || raw === '') return false
+  return TRUTHY_FLAGS.has(raw.toLowerCase())
+}
+
+/** 排序方式：不传默认 default，必须在白名单里 */
+function parseSort(raw: string | undefined): ProductSort {
+  if (raw === undefined || raw === '') return 'default'
+  if (!PRODUCT_SORTS.includes(raw as ProductSort)) {
+    throw new ProductError(
+      PRODUCT_ERROR_SPECS.invalidSort,
+      `sort 只能是 ${PRODUCT_SORTS.join(' / ')}`,
+    )
+  }
+  return raw as ProductSort
+}
+
+/** 分页参数：不传用默认值，传了必须是正整数 */
+function parsePositiveInt(raw: string | undefined, fallback: number, field: string): number {
+  if (raw === undefined || raw === '') return fallback
+
+  const parsed = Number(raw)
+  if (!Number.isInteger(parsed) || parsed <= 0) {
+    throw new ProductError(PRODUCT_ERROR_SPECS.invalidQuery, `${field} 必须是正整数`)
+  }
+  return parsed
+}
+
+function toListVO(entity: ProductListEntity): ProductListItemVO {
+  return {
+    id: entity.id,
+    title: entity.title,
+    description: entity.description,
+    price: entity.price,
+    stock: entity.stock,
+    status: entity.status,
+    coverImage: entity.imageUrl,
+    sellerId: entity.sellerId,
+    sellerName: entity.sellerName,
+    sellerAvatarUrl: entity.sellerAvatarUrl,
+    categoryId: entity.categoryId,
+    categoryName: entity.categoryName,
+    rating: roundTo2(entity.rating),
+    sales: entity.sales,
+    createdAt: entity.createdAt.toISOString(),
+  }
 }
 
 /** 实体 + 图片 → 详情 VO */
@@ -189,6 +270,41 @@ export class ProductService {
       list: related.map(toRelatedVO),
       categoryId: meta.categoryId,
       categoryName: meta.categoryName,
+    }
+  }
+
+  /**
+   * 商品列表：分类筛选 + 只看有货 + 排序 + 分页
+   * ------------------------------------------------------------------
+   * 只返回在售商品（下架的不进列表）；
+   * categoryId 不传 / 传 0 表示全部分类，返回里回显 categoryId=null。
+   */
+  async listProducts(query: ProductListQueryDTO): Promise<ProductListVO> {
+    const categoryId = parseCategoryId(query.categoryId)
+    const onlyInStock = parseOnlyInStock(query.onlyInStock)
+    const sort = parseSort(query.sort)
+
+    const page = parsePositiveInt(query.page, DEFAULT_PAGE, 'page')
+    const rawPageSize = parsePositiveInt(query.pageSize, DEFAULT_PAGE_SIZE, 'pageSize')
+    const pageSize = Math.min(rawPageSize, MAX_PAGE_SIZE)
+
+    const [items, total] = await Promise.all([
+      this.repo.findList({
+        categoryId,
+        onlyInStock,
+        sort,
+        limit: pageSize,
+        offset: (page - 1) * pageSize,
+      }),
+      this.repo.countList({ categoryId, onlyInStock }),
+    ])
+
+    return {
+      list: items.map(toListVO),
+      total,
+      page,
+      pageSize,
+      categoryId,
     }
   }
 }

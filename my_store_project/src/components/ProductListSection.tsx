@@ -19,12 +19,19 @@ export interface ProductListSectionProps {
   favoriteIds: ReadonlySet<number>
   onToggleFavorite: (productId: number) => void
   onAddToCart: (product: Product) => void
+  /** 正在请求列表（切换分类时会短暂为 true） */
+  loading?: boolean
+  /** 请求失败时的可读提示 */
+  error?: string | null
+  /** 失败后的重试入口 */
+  onRetry?: () => void
 }
 
 /**
  * 商品列表区域（首页）
  * 顶部提供排序与“只看有货”筛选，下方是 ProductCard 组成的网格；
  * 无匹配结果时展示空状态，避免出现空白页。
+ * 列表数据由首页从 /api/products 拉取，这里只负责展示加载 / 失败 / 空三种状态。
  */
 export default function ProductListSection({
   products,
@@ -39,6 +46,9 @@ export default function ProductListSection({
   favoriteIds,
   onToggleFavorite,
   onAddToCart,
+  loading = false,
+  error = null,
+  onRetry,
 }: ProductListSectionProps) {
   const hasFilter = keyword.length > 0 || activeCategoryName !== null || onlyInStock
 
@@ -97,7 +107,28 @@ export default function ProductListSection({
         </div>
       )}
 
-      {products.length > 0 ? (
+      {loading && products.length === 0 ? (
+        <div className={styles.empty}>
+          <span className={styles.emptyIcon}>
+            <SearchIcon size={22} />
+          </span>
+          <h3>正在加载商品…</h3>
+          <p>正在从服务器获取这个分类下的商品</p>
+        </div>
+      ) : error !== null ? (
+        <div className={styles.empty}>
+          <span className={styles.emptyIcon}>
+            <CloseIcon size={22} />
+          </span>
+          <h3>商品加载失败</h3>
+          <p>{error}</p>
+          {onRetry && (
+            <button type="button" className={styles.emptyAction} onClick={onRetry}>
+              重试
+            </button>
+          )}
+        </div>
+      ) : products.length > 0 ? (
         <>
           <div className={styles.grid}>
             {products.map((product) => (

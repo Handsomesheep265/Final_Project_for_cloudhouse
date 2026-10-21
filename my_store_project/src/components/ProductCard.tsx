@@ -73,7 +73,8 @@ export default function ProductCard({
         <div className={styles.meta}>
           <span className={styles.rating}>
             <StarIcon size={11} />
-            {product.rating.toFixed(1)}
+            {/* rating 来自 reviews 平均分，没有评价时显示「暂无评分」而不是 0.0 */}
+            {product.rating > 0 ? product.rating.toFixed(1) : '暂无评分'}
           </span>
           <span className={styles.sales}>已售 {formatCount(product.sales)}</span>
         </div>

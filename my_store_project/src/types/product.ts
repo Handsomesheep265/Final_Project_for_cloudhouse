@@ -80,3 +80,44 @@ export interface RelatedProductListVO {
   categoryId: number
   categoryName: string
 }
+
+/** 排序方式（与后端 /api/products 的 sort 参数一一对应） */
+export type ProductSort = 'default' | 'price-asc' | 'price-desc' | 'sales' | 'rating'
+
+/**
+ * 商品列表项（首页列表 / 分类筛选）
+ * ----------------------------------------------------------------------------
+ * 除了卡片需要的字段，还带派生指标 rating / sales（后端现算，不是表里的列），
+ * 以及分类、卖家信息，前端不用再逐个请求。
+ */
+export interface ProductListItemVO {
+  id: number
+  title: string
+  description: string | null
+  price: number
+  /** 库存，0 表示售罄 */
+  stock: number
+  /** 1 上架（列表只会返回上架商品） */
+  status: number
+  coverImage: string | null
+  sellerId: number
+  sellerName: string
+  sellerAvatarUrl: string | null
+  categoryId: number
+  categoryName: string
+  /** 评价平均分，没有评价为 0 */
+  rating: number
+  /** 累计销量（不含已取消订单），没有成交为 0 */
+  sales: number
+  createdAt: string
+}
+
+/** GET /api/products */
+export interface ProductListVO {
+  list: ProductListItemVO[]
+  total: number
+  page: number
+  pageSize: number
+  /** 实际筛选的分类 id；null 表示全部 */
+  categoryId: number | null
+}

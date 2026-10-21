@@ -17,6 +17,7 @@ import { env } from './config/env'
 import { closePool, pingDatabase } from './config/database'
 import { errorHandler } from './middlewares/errorHandler'
 import { cartRouter } from './routes/cartRoutes'
+import { categoryRouter } from './routes/categoryRoutes'
 import { orderRouter } from './routes/orderRoutes'
 import { productRouter } from './routes/productRoutes'
 import { profileRouter } from './routes/profileRoutes'
@@ -72,6 +73,7 @@ export function createApp(): Express {
   })
 
   // 业务路由
+  app.use('/api/categories', categoryRouter)
   app.use('/api/search', searchRouter)
   app.use('/api/products', productRouter)
   app.use('/api/cart', cartRouter)
@@ -108,6 +110,7 @@ async function bootstrap(): Promise<void> {
     console.log(`🚀 手帐集市后端已启动：http://127.0.0.1:${env.port}（${env.nodeEnv}）`)
     console.log('   健康检查   GET  /health')
     console.log('   搜索接口   GET  /api/search?keyword=手帐&type=all')
+    console.log('   分类接口   GET  /api/categories')
     console.log('   商品接口   GET  /api/products/:productId（详情）')
     console.log('              GET  /api/products/:productId/related（相关推荐）')
     console.log('   购物车接口 GET  /api/cart')

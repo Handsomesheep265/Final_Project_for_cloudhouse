@@ -75,7 +75,7 @@ export default function RecommendCard({
           <SellerBadge name={product.sellerName} avatar={product.sellerAvatar} size="sm" />
           <span className={styles.rating}>
             <StarIcon size={12} />
-            {product.rating.toFixed(1)}
+            {product.rating > 0 ? product.rating.toFixed(1) : '暂无评分'}
           </span>
         </div>
 

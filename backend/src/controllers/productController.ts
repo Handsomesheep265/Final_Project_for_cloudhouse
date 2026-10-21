@@ -12,7 +12,7 @@ import type { Request, RequestHandler, Response } from 'express'
 import type { AuthenticatedRequest } from '../middlewares/auth'
 import { productService, ProductService } from '../services/productService'
 import type { ApiResponse } from '../types/common'
-import type { RelatedProductQueryDTO } from '../types/product.dto'
+import type { ProductListQueryDTO, RelatedProductQueryDTO } from '../types/product.dto'
 
 /** 统一成功响应 */
 function sendSuccess<T>(res: Response, data: T, status = 200): void {
@@ -49,7 +49,20 @@ function readRelatedQuery(req: Request): RelatedProductQueryDTO {
   return { limit: queryString(req.query.limit) }
 }
 
+/** 读商品列表参数（原样字符串，解析与校验在 service） */
+function readListQuery(req: Request): ProductListQueryDTO {
+  return {
+    categoryId: queryString(req.query.categoryId),
+    onlyInStock: queryString(req.query.onlyInStock),
+    sort: queryString(req.query.sort),
+    page: queryString(req.query.page),
+    pageSize: queryString(req.query.pageSize),
+  }
+}
+
 export interface ProductController {
+  /** 商品列表（分类筛选） */
+  listProducts: RequestHandler
   /** 商品详情 */
   getProductDetail: RequestHandler
   /** 相关推荐 */
@@ -62,6 +75,14 @@ export interface ProductController {
  */
 export function createProductController(service: ProductService): ProductController {
   return {
+    /**
+     * GET /api/products?categoryId=1&onlyInStock=1&sort=price-asc&page=1&pageSize=12
+     * 首页商品列表 / 分类筛选；只返回在售商品。
+     */
+    listProducts: async (req, res) => {
+      sendSuccess(res, await service.listProducts(readListQuery(req)))
+    },
+
     /**
      * GET /api/products/:productId —— 商品详情
      * 返回商品、全部图片、卖家、分类、评价统计，以及当前用户的收藏/购物车状态。
