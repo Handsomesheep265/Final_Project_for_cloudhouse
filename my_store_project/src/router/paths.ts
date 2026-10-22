@@ -26,6 +26,8 @@ export const ROUTES = {
   products: '/products',
   /** 搜索结果页（?keyword= 由页面自己写进 URL） */
   search: '/search',
+  /** AI 手帐助手（全局悬浮入口进入的聊天页） */
+  assistant: '/assistant',
 } as const
 
 /** 已实现页面的路径类型 */

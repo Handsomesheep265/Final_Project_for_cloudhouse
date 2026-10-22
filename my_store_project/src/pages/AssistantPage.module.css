@@ -1,0 +1,298 @@
+/* ==========================================================================
+   AI 手帐助手 · 聊天页
+   --------------------------------------------------------------------------
+   布局：整页固定高度（100svh）→ 页头 + 可滚动消息区 + 固定底部输入条。
+   不显示底部导航：聊天时输入条就是主操作，避免三套「底部栏」打架。
+   ========================================================================== */
+
+.page {
+  display: flex;
+  flex-direction: column;
+  height: 100svh;
+  background: var(--bg);
+}
+
+/* ------------------------------ 消息区 ------------------------------ */
+
+.main {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 14px 24px 132px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.notice {
+  padding: 8px 12px;
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  font-size: 11.5px;
+  line-height: 1.6;
+  color: var(--text-subtle);
+  text-align: center;
+}
+
+.messages {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.rowAssistant,
+.rowUser {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.rowUser {
+  justify-content: flex-end;
+}
+
+.avatar {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 30px;
+  height: 30px;
+  margin-top: 2px;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+}
+
+/* 气泡基础样式：助手在左（浅色卡片），用户在右（主色） */
+.bubbleAssistant,
+.bubbleUser {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  max-width: min(78%, 560px);
+  padding: 10px 13px;
+  border-radius: var(--radius-md);
+  font-size: 13px;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.bubbleAssistant {
+  border: 1px solid var(--border);
+  border-bottom-left-radius: 6px;
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow-sm);
+}
+
+.bubbleUser {
+  border-bottom-right-radius: 6px;
+  background: var(--accent);
+  color: var(--text-on-accent);
+}
+
+/* 每一行单独成块，保留模型回复里的换行与列表感 */
+.line {
+  display: block;
+}
+
+/* 助手「正在输入」的三个点 */
+.typing {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 13px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  border-bottom-left-radius: 6px;
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.typing i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--text-subtle);
+  animation: typing 1.1s var(--ease) infinite;
+}
+
+.typing i:nth-child(2) {
+  animation-delay: 0.16s;
+}
+
+.typing i:nth-child(3) {
+  animation-delay: 0.32s;
+}
+
+@keyframes typing {
+  0%,
+  60%,
+  100% {
+    opacity: 0.28;
+    transform: translateY(0);
+  }
+
+  30% {
+    opacity: 1;
+    transform: translateY(-3px);
+  }
+}
+
+/* ------------------------------ 推荐问题 ------------------------------ */
+
+.suggestions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.suggestionsTitle {
+  font-size: 11.5px;
+  color: var(--text-subtle);
+}
+
+.suggestionList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.suggestion {
+  height: 32px;
+  padding: 0 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  font-size: 12.5px;
+  color: var(--text-muted);
+  transition:
+    color var(--transition),
+    border-color var(--transition),
+    background-color var(--transition);
+}
+
+.suggestion:hover {
+  color: var(--accent-strong);
+  border-color: color-mix(in srgb, var(--accent) 32%, transparent);
+  background: var(--accent-soft);
+}
+
+/* ------------------------------ 输入条 ------------------------------ */
+
+.composer {
+  position: fixed;
+  left: 50%;
+  bottom: 18px;
+  z-index: 55;
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  width: min(760px, calc(100% - 32px));
+  padding: 8px 8px 8px 14px;
+  transform: translateX(-50%);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-lg);
+}
+
+.input {
+  flex: 1;
+  min-height: 36px;
+  max-height: 132px;
+  padding: 7px 0;
+  border: 0;
+  background: transparent;
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--text);
+  resize: none;
+}
+
+.input:focus {
+  outline: none;
+}
+
+.input::placeholder {
+  color: var(--text-subtle);
+}
+
+.sendBtn {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--text-on-accent);
+  transition:
+    background-color var(--transition),
+    opacity var(--transition),
+    transform var(--transition);
+}
+
+.sendBtn:hover:not(:disabled) {
+  background: var(--accent-strong);
+}
+
+.sendBtn:active:not(:disabled) {
+  transform: scale(0.96);
+}
+
+.sendBtn:disabled {
+  background: var(--surface-hover);
+  color: var(--text-subtle);
+}
+
+.clearBtn {
+  height: 28px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  font-size: 12px;
+  color: var(--text-muted);
+  transition:
+    color var(--transition),
+    border-color var(--transition),
+    background-color var(--transition);
+}
+
+.clearBtn:hover {
+  color: var(--text);
+  border-color: var(--border-strong);
+  background: var(--surface-hover);
+}
+
+/* ------------------------------ 响应式 ------------------------------ */
+
+@media (max-width: 600px) {
+  .main {
+    gap: 12px;
+    padding: 12px 16px 124px;
+  }
+
+  .composer {
+    bottom: 0;
+    width: 100%;
+    padding: 8px 10px calc(8px + env(safe-area-inset-bottom)) 14px;
+    border-right: 0;
+    border-bottom: 0;
+    border-left: 0;
+    border-radius: var(--radius-md) var(--radius-md) 0 0;
+  }
+
+  .bubbleAssistant,
+  .bubbleUser {
+    max-width: 84%;
+    font-size: 13px;
+  }
+}

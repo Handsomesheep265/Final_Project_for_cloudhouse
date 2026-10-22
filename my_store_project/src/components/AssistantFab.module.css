@@ -1,0 +1,70 @@
+/* ==========================================================================
+   AI 手帐助手 · 全局悬浮入口
+   --------------------------------------------------------------------------
+   位置：右下角、底部导航上方；页面里有固定操作条时抬高（见 fabRaised）。
+   形态：圆形图标按钮（52px），不挡页面内容太多 —— 商品卡右下角是「加入购物车」，
+        所以只占一个小圆点，而不是一条长按钮。
+   层级：58（高于页面内容与操作条的 55，低于底部导航的 60）。
+   ========================================================================== */
+
+.fab {
+  position: fixed;
+  right: 18px;
+  bottom: 92px;
+  z-index: 58;
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  border: 1px solid color-mix(in srgb, var(--accent) 38%, transparent);
+  border-radius: 50%;
+  background: linear-gradient(150deg, var(--accent), var(--accent-strong));
+  color: var(--text-on-accent);
+  box-shadow: var(--shadow-lg);
+  animation: fabIn 380ms var(--ease) both;
+  transition:
+    transform var(--transition),
+    box-shadow var(--transition),
+    filter var(--transition);
+}
+
+.fab:hover {
+  transform: translateY(-2px) scale(1.03);
+  box-shadow: 0 18px 32px -18px rgba(24, 18, 12, 0.55);
+  filter: saturate(1.08);
+}
+
+.fab:active {
+  transform: translateY(0) scale(0.97);
+}
+
+/* 页面有固定底部操作条时抬高，别挡住「提交订单 / 加入购物车」 */
+.fabRaised {
+  bottom: 176px;
+}
+
+@keyframes fabIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.9);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* 手机端：贴着底部导航上沿；有操作条时同样抬高 */
+@media (max-width: 560px) {
+  .fab {
+    right: 14px;
+    bottom: calc(70px + env(safe-area-inset-bottom));
+    width: 50px;
+    height: 50px;
+  }
+
+  .fabRaised {
+    bottom: calc(178px + env(safe-area-inset-bottom));
+  }
+}

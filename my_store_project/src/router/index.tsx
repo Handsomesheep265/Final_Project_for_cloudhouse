@@ -12,6 +12,7 @@ import ProfilePage from '../pages/ProfilePage'
 import SearchPage from '../pages/SearchPage'
 import ForgotPasswordPage from '../pages/ForgotPasswordPage'
 import ResetPasswordPage from '../pages/ResetPasswordPage'
+import AssistantPage from '../pages/AssistantPage'
 import { ROUTES } from './paths'
 
 /**
@@ -27,6 +28,7 @@ import { ROUTES } from './paths'
  * - `/register`            注册（与登录同一套 UI，靠路径区分模式）
  * - `/forgot-password`     找回密码（填邮箱，开发环境直接给出重置链接）
  * - `/reset-password?token=…` 用邮件里的一次性令牌设置新密码
+ * - `/assistant`           AI 手帐助手（全局悬浮按钮进入的聊天页，公开页面）
  *
  * 需要登录（包一层 RequireAuth，未登录时跳登录页并记住来源）：
  * - `/cart`            购物车
@@ -100,6 +102,10 @@ export const router = createBrowserRouter([
       {
         path: ROUTES.resetPassword,
         element: <ResetPasswordPage />,
+      },
+      {
+        path: ROUTES.assistant,
+        element: <AssistantPage />,
       },
       {
         path: `${ROUTES.products}/:productId`,

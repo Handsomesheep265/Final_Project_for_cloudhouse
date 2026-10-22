@@ -230,3 +230,12 @@ export function EyeOffIcon(props: IconProps) {
     </Svg>
   )
 }
+
+export function SendIcon(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M4.4 11.7 20 4.2l-7.6 15.6-1.9-6.3z" />
+      <path d="m10.5 13.5 9.5-9.3" />
+    </Svg>
+  )
+}
