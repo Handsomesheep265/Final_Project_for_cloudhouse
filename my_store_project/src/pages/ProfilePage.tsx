@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
-import { Link, Navigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import BottomNavBar from '../components/BottomNavBar'
 import PageHeader from '../components/PageHeader'
 import ProductThumb from '../components/ProductThumb'
@@ -18,8 +18,8 @@ import {
 import type { ProfileVO, SellerProductVO } from '../types/profile'
 import { formatDateTime, formatPrice } from '../utils/format'
 import { resolveImageUrl } from '../utils/assetUrl'
-import { isLoggedIn } from '../utils/authSession'
-import { ROUTES, loginPath } from '../router/paths'
+import { useAuthStore } from '../stores/authStore'
+import { ROUTES } from '../router/paths'
 import styles from './ProfilePage.module.css'
 
 /** 提示浮层停留时间 */
@@ -62,19 +62,15 @@ function validateForm(form: EditForm): string | null {
  *
  * 编辑资料是一个 PATCH 弹窗：只提交用户改过的字段语义上的三个字段，
  * 空串表示清空（后端会把 null 写库），保存成功后用返回的完整资料替换本地状态。
+ *
+ * 未登录不会进到这里：路由层已经包了 RequireAuth（见 router/index.tsx）。
+ * 右上角的「退出」会先请后端把当前 token 拉黑，再清本地登录态 ——
+ * 购物车/收藏的本地清理由 AuthBootstrap 监听登录态变化统一处理。
  */
 export default function ProfilePage() {
-  // 还没做全局登录态，这里先做最小守卫：本地没有有效 token 就送回登录页，
-  // 登录成功后由 ?next= 跳回 /profile。换成全局 store 时只改这一处判断。
-  if (!isLoggedIn()) {
-    return <Navigate to={loginPath(ROUTES.profile)} replace />
-  }
+  const navigate = useNavigate()
+  const logout = useAuthStore((state) => state.logout)
 
-  return <ProfileContent />
-}
-
-/** 页面主体：只有在「已登录」时才会渲染 */
-function ProfileContent() {
   const cartCount = useCartStore(selectTotalQuantity)
   const addToCart = useCartStore((state) => state.addItem)
   const fetchCart = useCartStore((state) => state.fetchCart)
@@ -122,6 +118,17 @@ function ProfileContent() {
       setStatus('error')
     }
   }, [])
+
+  /**
+   * 退出登录：先等后端把当前 token 拉黑（这样旧 token 立刻失效），再回首页。
+   * 本地购物车/收藏由 AuthBootstrap 监听登录态变化统一清空，这里不用重复处理。
+   */
+  const handleLogout = useCallback(() => {
+    void (async () => {
+      await logout()
+      navigate(ROUTES.home, { replace: true })
+    })()
+  }, [logout, navigate])
 
   useEffect(() => {
     // 数据拉取型 effect：请求资料与商品后写入状态；setState 都在 await 之后
@@ -252,9 +259,14 @@ function ProfileContent() {
         backLabel="返回首页"
         right={
           profile ? (
-            <button type="button" className={styles.editBtn} onClick={openEdit}>
-              编辑资料
-            </button>
+            <div className={styles.headerActions}>
+              <button type="button" className={styles.editBtn} onClick={openEdit}>
+                编辑资料
+              </button>
+              <button type="button" className={styles.logoutBtn} onClick={handleLogout}>
+                退出
+              </button>
+            </div>
           ) : null
         }
       />

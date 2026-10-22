@@ -7,6 +7,8 @@ import { ArrowLeftIcon, CloseIcon, SearchIcon } from '../components/Icons'
 import { ApiError } from '../api/client'
 import { searchApi } from '../api/search'
 import { selectTotalQuantity, useCartStore } from '../stores/cartStore'
+import { selectAuthStatus, useAuthStore } from '../stores/authStore'
+import { useLoginGate } from '../utils/useLoginGate'
 import type { ProductSearchItemVO, ShopSearchItemVO } from '../types/search'
 import { resolveImageUrl } from '../utils/assetUrl'
 import { ROUTES } from '../router/paths'
@@ -47,6 +49,10 @@ function toMessage(error: unknown, fallback: string): string {
 export default function SearchPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const keyword = (searchParams.get('keyword') ?? '').trim()
+
+  /** 搜索页可匿名浏览；点「加入购物车」时才要求登录 */
+  const requireLogin = useLoginGate()
+  const authStatus = useAuthStore(selectAuthStatus)
 
   const cartCount = useCartStore(selectTotalQuantity)
   const addItem = useCartStore((state) => state.addItem)
@@ -180,7 +186,7 @@ export default function SearchPage() {
 
   useEffect(() => {
     void fetchCart()
-  }, [fetchCart])
+  }, [fetchCart, authStatus])
 
   useEffect(() => {
     if (!note) return undefined
@@ -190,6 +196,8 @@ export default function SearchPage() {
 
   const handleAddToCart = useCallback(
     async (item: ProductSearchItemVO) => {
+      if (!requireLogin('加入购物车')) return
+
       setAddingId(item.id)
       try {
         await addItem(item.id)
@@ -200,7 +208,7 @@ export default function SearchPage() {
         setAddingId(null)
       }
     },
-    [addItem],
+    [addItem, requireLogin],
   )
 
   const hasKeyword = keyword.length >= KEYWORD_MIN_LENGTH

@@ -2,21 +2,24 @@
  * 认证控制器（Controller）
  * ----------------------------------------------------------------------------
  * 只做三件事（与购物车 / 订单 / 个人主页控制器同构）：
- *   1. 从请求里取出参数：注册/登录的字段来自 body，当前用户来自鉴权中间件；
+ *   1. 从请求里取出参数：注册/登录/找回密码的字段来自 body，当前用户与 token 来自鉴权中间件；
  *   2. 调 service；
  *   3. 用统一响应体 { code, message, data } 返回。
  *
  * body 一律原样透传（req.body 可能是 undefined、字符串、数组），
  * 校验全部在 authService，非法输入返回 4002x 而不是 500。
  *
- * 说明：本模块刻意不写 logout —— JWT 是无状态的，退出登录由前端删掉本地 token 完成；
- * 真要「服务端强制下线」，得引入 token 黑名单表，属于后续迭代。
+ * 五个接口：
+ *   register / login        公开
+ *   forgot-password         公开（防邮箱枚举：邮箱不存在也返回 accepted=true）
+ *   reset-password          公开（靠邮件里的一次性令牌证明身份）
+ *   me / logout             需要登录（requireAuth 已挡在前面，这里再兜一层）
  */
 import type { Request, RequestHandler, Response } from 'express'
 import type { AuthenticatedRequest } from '../middlewares/auth'
 import { AUTH_ERRORS, AuthError, authService, AuthService } from '../services/authService'
 import type { ApiResponse } from '../types/common'
-import type { LoginDTO, RegisterDTO } from '../types/auth.dto'
+import type { ForgotPasswordDTO, LoginDTO, RegisterDTO, ResetPasswordDTO } from '../types/auth.dto'
 
 /** 统一成功响应 */
 function sendSuccess<T>(res: Response, data: T, status = 200): void {
@@ -47,8 +50,14 @@ export interface AuthController {
   register: RequestHandler
   /** 登录 */
   login: RequestHandler
-  /** 当前登录用户 */
+  /** 当前会话（顺带续签 token） */
   me: RequestHandler
+  /** 退出登录（把当前 token 加入黑名单） */
+  logout: RequestHandler
+  /** 申请重置密码（发一次性链接） */
+  forgotPassword: RequestHandler
+  /** 用一次性令牌设置新密码 */
+  resetPassword: RequestHandler
 }
 
 /**
@@ -71,12 +80,54 @@ export function createAuthController(service: AuthService): AuthController {
     },
 
     /**
-     * GET /api/auth/me —— 用 Authorization: Bearer <token> 换回当前用户
+     * GET /api/auth/me —— 用 Authorization: Bearer <token> 换回当前会话
      * 前端刷新页面时用它恢复登录状态（token 存 localStorage，资料不存）。
+     * 返回新的 token + 过期时间（滑动续期，见 authService.getSession）。
      */
     me: async (req, res) => {
       const userId = requireUserId(req)
-      sendSuccess(res, await service.getCurrentUser(userId))
+      const { authToken, tokenExpiresAt } = req as AuthenticatedRequest
+      // 带上「本次出示的 token」：service 会把它拉黑并签发新 token（凭证轮换）
+      const presented =
+        authToken && tokenExpiresAt ? { token: authToken, expiresAt: tokenExpiresAt } : undefined
+
+      sendSuccess(res, await service.getSession(userId, presented))
+    },
+
+    /**
+     * POST /api/auth/logout —— 退出登录
+     * 需要登录：从请求头里取回原始 token 与过期时间，交给 service 写黑名单。
+     * 前端拿到 200 后删本地 token；即使它没删，这个 token 也已经调不动接口了。
+     */
+    logout: async (req, res) => {
+      const userId = requireUserId(req)
+      const { authToken, tokenExpiresAt } = req as AuthenticatedRequest
+      if (!authToken || !tokenExpiresAt) {
+        throw new AuthError(AUTH_ERRORS.unauthorized)
+      }
+
+      await service.logout(userId, authToken, tokenExpiresAt)
+      sendSuccess(res, null)
+    },
+
+    /**
+     * POST /api/auth/forgot-password —— 申请重置密码
+     * body: { email }
+     * 永远返回 accepted=true（不泄露邮箱是否注册过）；开发环境额外带 devResetUrl。
+     */
+    forgotPassword: async (req, res) => {
+      const dto: ForgotPasswordDTO = readBody(req)
+      sendSuccess(res, await service.requestPasswordReset(dto))
+    },
+
+    /**
+     * POST /api/auth/reset-password —— 用邮件里的一次性令牌改密码
+     * body: { token, password }
+     * 成功后此前所有 token 失效，前端应引导用户重新登录。
+     */
+    resetPassword: async (req, res) => {
+      const dto: ResetPasswordDTO = readBody(req)
+      sendSuccess(res, await service.resetPassword(dto))
     },
   }
 }

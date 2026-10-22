@@ -26,3 +26,17 @@ export interface LoginDTO {
   email?: unknown
   password?: unknown
 }
+
+/** POST /api/auth/forgot-password —— 申请重置密码 */
+export interface ForgotPasswordDTO {
+  /** 注册时用的邮箱 */
+  email?: unknown
+}
+
+/** POST /api/auth/reset-password —— 用邮件里的一次性令牌设置新密码 */
+export interface ResetPasswordDTO {
+  /** 邮件链接里的令牌（前端从 ?token= 取） */
+  token?: unknown
+  /** 新密码，规则同注册 */
+  password?: unknown
+}

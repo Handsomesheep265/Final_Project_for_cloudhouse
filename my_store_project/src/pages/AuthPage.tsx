@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react'
 import type { FormEvent } from 'react'
-import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
+import { Link, Navigate, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import BottomNavBar from '../components/BottomNavBar'
 import PageHeader from '../components/PageHeader'
 import {
@@ -12,9 +12,8 @@ import {
   UserIcon,
 } from '../components/Icons'
 import { ApiError } from '../api/client'
-import { authApi } from '../api/auth'
-import { selectTotalQuantity, useCartStore } from '../stores/cartStore'
-import { saveSession } from '../utils/authSession'
+import { useCartStore, selectTotalQuantity } from '../stores/cartStore'
+import { selectAuthStatus, selectExpiredReason, useAuthStore } from '../stores/authStore'
 import { ROUTES, safeNextPath } from '../router/paths'
 import styles from './AuthPage.module.css'
 
@@ -85,13 +84,16 @@ function inputClass(hasError: boolean): string {
 /**
  * 登录 / 注册页（/login、/register）
  * ----------------------------------------------------------------------------
- * 一个页面两种模式，靠 URL 区分（便于直接分享 /login 链接，也方便以后加「未登录跳转」）：
+ * 一个页面两种模式，靠 URL 区分（便于直接分享 /login 链接，也方便加「未登录跳转」）：
  *   - 登录：邮箱 + 密码；
  *   - 注册：昵称（选填，不填用邮箱前缀）+ 邮箱 + 密码 + 确认密码。
  *
- * 提交成功后把后端返回的 token 存进 localStorage（utils/authSession.ts），
+ * 提交成功后由 authStore 保存会话（token / 用户 / 过期时间，持久化在 localStorage），
  * 然后跳到 ?next= 指定的页面（默认个人主页）。
- * 这一步只是「能登录」，全局登录态（导航栏头像、跨页面自动同步）留到下一阶段。
+ *
+ * 页面顶部的提示来自两处：
+ *   - location.state.intent：用户在首页点收藏/加购被拦下来，登录页告诉他「登录后即可收藏商品」；
+ *   - authStore.expiredReason：用到一半 token 过期被 401 拦截，提示「登录状态已过期」。
  */
 export default function AuthPage() {
   const navigate = useNavigate()
@@ -99,9 +101,22 @@ export default function AuthPage() {
   const [searchParams] = useSearchParams()
   const cartCount = useCartStore(selectTotalQuantity)
 
+  const status = useAuthStore(selectAuthStatus)
+  const expiredReason = useAuthStore(selectExpiredReason)
+  const signIn = useAuthStore((state) => state.login)
+  const signUp = useAuthStore((state) => state.register)
+
   const mode: AuthMode = location.pathname === ROUTES.register ? 'register' : 'login'
   /** 登录成功后去哪儿：只接受站内路径，默认个人主页 */
   const nextPath = safeNextPath(searchParams.get('next'))
+
+  // 被登录闸门拦下时的操作名（收藏商品 / 加入购物车…）
+  const intentRaw = (location.state as { intent?: unknown } | null)?.intent
+  const intent = typeof intentRaw === 'string' ? intentRaw : null
+
+  // 从重置密码页带过来的提示（如「密码已重置，请用新密码登录」）
+  const noticeRaw = (location.state as { notice?: unknown } | null)?.notice
+  const stateNotice = typeof noticeRaw === 'string' ? noticeRaw : null
 
   // 切换登录/注册时把邮箱带过去，省得重新输入（切换会重挂载组件）
   const [form, setForm] = useState<AuthForm>(() => {
@@ -125,16 +140,18 @@ export default function AuthPage() {
     setFormError(null)
   }, [])
 
-  /** 切换登录 ↔ 注册：URL 变化 + 带上已输入的邮箱 */
+  /** 切换登录 ↔ 注册：URL 变化 + 带上已输入的邮箱与拦截原因 */
   const switchMode = useCallback(
     (target: AuthMode) => {
       const path = target === 'register' ? ROUTES.register : ROUTES.login
       const query = searchParams.toString()
-      navigate(query ? `${path}?${query}` : path, { state: { email: form.email } })
+      navigate(query ? `${path}?${query}` : path, {
+        state: { email: form.email, ...(intent === null ? {} : { intent }) },
+      })
       setErrors({})
       setFormError(null)
     },
-    [navigate, searchParams, form.email],
+    [navigate, searchParams, form.email, intent],
   )
 
   /** 演示账号一键填入，省得对着文档手敲 */
@@ -157,18 +174,18 @@ export default function AuthPage() {
       const email = form.email.trim()
       setSubmitting(true)
       try {
-        const session =
-          mode === 'register'
-            ? await authApi.register({
-              email,
-              password: form.password,
-              // 昵称空着就不传，交给后端用邮箱前缀兜底
-              ...(form.nickname.trim() ? { nickname: form.nickname.trim() } : {}),
-            })
-            : await authApi.login({ email, password: form.password })
+        if (mode === 'register') {
+          await signUp({
+            email,
+            password: form.password,
+            // 昵称空着就不传，交给后端用邮箱前缀兜底
+            ...(form.nickname.trim() ? { nickname: form.nickname.trim() } : {}),
+          })
+        } else {
+          await signIn({ email, password: form.password })
+        }
 
-        saveSession(session)
-        // replace：登录页不留在历史里，避免登录后按返回又回到登录页
+        // 会话已由 authStore 写进 localStorage；replace：登录页不留在历史里
         navigate(nextPath, { replace: true })
       } catch (error) {
         if (error instanceof ApiError) {
@@ -187,19 +204,25 @@ export default function AuthPage() {
         setSubmitting(false)
       }
     },
-    [mode, form, submitting, navigate, nextPath],
+    [mode, form, submitting, navigate, nextPath, signIn, signUp],
   )
 
   const isRegister = mode === 'register'
   const submitLabel = isRegister ? '注册并登录' : '登录'
+
+  // 已登录用户直接去目标页（例如点错又点回 /login）
+  if (status === 'authenticated') {
+    return <Navigate to={nextPath} replace />
+  }
 
   return (
     <div className={styles.page}>
       <PageHeader
         title={isRegister ? '注册' : '登录'}
         titleAs="h2"
-        to={ROUTES.home}
-        backLabel="返回首页"
+        // 返回 = 放弃登录，回到刚才想去的页面（没有 next 就回首页）
+        to={safeNextPath(searchParams.get('next'), ROUTES.home)}
+        backLabel="返回上一页"
       />
 
       <main className={styles.main}>
@@ -238,6 +261,15 @@ export default function AuthPage() {
               注册
             </button>
           </div>
+
+          {/* 三种说明：重置密码后的提示 / 登录过期 / 被登录闸门拦下 */}
+          {(stateNotice !== null ||
+            expiredReason !== null ||
+            (intent !== null && !isRegister)) && (
+            <p className={styles.notice} role="status">
+              {stateNotice ?? expiredReason ?? `登录后即可${intent}`}
+            </p>
+          )}
 
           <form className={styles.form} onSubmit={(event) => void handleSubmit(event)} noValidate>
             {isRegister && (
@@ -325,6 +357,13 @@ export default function AuthPage() {
               )}
               {isRegister && !errors.password && (
                 <span className={styles.fieldHint}>至少 {PASSWORD_MIN} 位，建议字母加数字</span>
+              )}
+              {!isRegister && (
+                <span className={styles.fieldFooter}>
+                  <Link className={styles.textLink} to={ROUTES.forgotPassword}>
+                    忘记密码？
+                  </Link>
+                </span>
               )}
             </label>
 

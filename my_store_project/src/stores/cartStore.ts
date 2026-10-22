@@ -7,10 +7,17 @@
  *
  * 为什么去掉了 persist：购物车已经持久化在 MySQL 里，
  * 再往 localStorage 存一份会出现「本地有、服务端没有」的脏数据。
+ *
+ * 与登录态的关系（全局登录态落地后新增）：
+ *   - 未登录时购物车接口会返回 401，所以这里直接不请求，本地按空车处理；
+ *   - 写操作在未登录时抛 40102，页面通常已被 useLoginGate 拦在前面，
+ *     这里是第二道保险（防止哪里漏了拦截就给后端发请求）；
+ *   - logout() 时由页面调用 reset()，避免上一个账号的购物车残留在界面上。
  */
 import { create } from 'zustand'
 import { ApiError } from '../api/client'
 import { cartApi } from '../api/cart'
+import { isAuthenticatedNow, loginRequiredError } from './authStore'
 import type { CartItemVO, CartSummaryVO, CartVO } from '../types/cart'
 
 const EMPTY_SUMMARY: CartSummaryVO = {
@@ -36,7 +43,7 @@ interface CartState {
 }
 
 interface CartActions {
-  /** 拉取购物车（页面挂载时调用） */
+  /** 拉取购物车（页面挂载时调用）；未登录时只把本地清空，不发请求 */
   fetchCart: () => Promise<void>
   addItem: (productId: number, quantity?: number) => Promise<void>
   setQuantity: (productId: number, quantity: number) => Promise<void>
@@ -46,6 +53,8 @@ interface CartActions {
   setAllSelected: (isSelected: boolean) => Promise<void>
   removeItem: (productId: number) => Promise<void>
   clearCart: () => Promise<void>
+  /** 清空本地状态（退出登录时调用，不必请求后端） */
+  reset: () => void
 }
 
 export interface CartStore extends CartState, CartActions {}
@@ -76,8 +85,13 @@ export const useCartStore = create<CartStore>()((set, get) => {
     set({ items: cart.items, summary: cart.summary, status: 'ready', loadError: null })
   }
 
-  const runMutation = (task: () => Promise<CartVO>): Promise<void> =>
-    enqueue(async () => {
+  const runMutation = (task: () => Promise<CartVO>): Promise<void> => {
+    // 未登录就别发请求了：后端一定回 401，前端这边给同样的业务码，页面提示更直接
+    if (!isAuthenticatedNow()) {
+      return Promise.reject(loginRequiredError('请先登录后再操作购物车'))
+    }
+
+    return enqueue(async () => {
       set({ mutating: true })
       try {
         applyCart(await task())
@@ -85,6 +99,7 @@ export const useCartStore = create<CartStore>()((set, get) => {
         set({ mutating: false })
       }
     })
+  }
 
   return {
     items: [],
@@ -94,12 +109,22 @@ export const useCartStore = create<CartStore>()((set, get) => {
     mutating: false,
 
     fetchCart: async () => {
+      if (!isAuthenticatedNow()) {
+        // 未登录：购物车接口是 401 的，不必去撞；本地按空车展示（角标 0）
+        set({ items: [], summary: EMPTY_SUMMARY, status: 'idle', loadError: null })
+        return
+      }
+
       set({ status: 'loading', loadError: null })
       try {
         applyCart(await cartApi.getCart())
       } catch (error) {
         set({ status: 'error', loadError: toMessage(error) })
       }
+    },
+
+    reset: () => {
+      set({ items: [], summary: EMPTY_SUMMARY, status: 'idle', loadError: null, mutating: false })
     },
 
     addItem: (productId, quantity = 1) =>

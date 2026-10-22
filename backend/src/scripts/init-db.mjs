@@ -3,7 +3,7 @@
  * ----------------------------------------------------------------------------
  * 作用：
  *   1. 目标库不存在时自动创建（字符集 utf8mb4）
- *   2. 依次执行 sql/schema.sql、sql/orders.sql 建表（CREATE TABLE IF NOT EXISTS，可重复执行）
+ *   2. 依次执行 sql/schema.sql、sql/orders.sql、sql/auth-extra.sql 建表（CREATE TABLE IF NOT EXISTS，可重复执行）
  *   3. 执行 sql/search-index.sql 补全文索引（先查 information_schema，已存在就跳过）
  *   4. products 为空时执行 sql/seed.sql 灌种子数据（避免重复插入图片）
  *
@@ -53,16 +53,20 @@ const TABLES = [
   'orders',
   'order_items',
   'payments',
+  'revoked_tokens',
+  'user_token_epochs',
+  'password_reset_tokens',
 ]
 
 /**
  * 建表与索引脚本按模块拆分，执行顺序固定：
  *   schema.sql       用户 / 商品 / 购物车 / 评价 / 收藏
  *   orders.sql       订单 / 订单明细 / 支付
+ *   auth-extra.sql   JWT 黑名单 / 用户凭证时间线 / 找回密码令牌
  *   search-index.sql 商品名 + 昵称的 ngram 全文索引（幂等，已存在则跳过）
- * 三个脚本都可以重复执行。
+ * 四个脚本都可以重复执行。
  */
-const SCHEMA_FILES = ['schema.sql', 'orders.sql', 'search-index.sql']
+const SCHEMA_FILES = ['schema.sql', 'orders.sql', 'auth-extra.sql', 'search-index.sql']
 
 const baseConfig = {
   host: DB_HOST,

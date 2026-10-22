@@ -126,6 +126,17 @@
 
 /* ------------------------------ 表单 ------------------------------ */
 
+/* 登录原因提示：被收藏/加购拦下、或登录过期 */
+.notice {
+  padding: 9px 12px;
+  border: 1px solid color-mix(in srgb, var(--accent) 26%, transparent);
+  border-radius: var(--radius-sm);
+  background: var(--accent-soft);
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--accent-strong);
+}
+
 .form {
   display: flex;
   flex-direction: column;
@@ -238,9 +249,93 @@
   color: var(--danger);
 }
 
+/* 「忘记密码？」这类行内文字链接 */
+.fieldFooter {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: -4px;
+}
+
+.textLink {
+  font-size: 11.5px;
+  color: var(--text-muted);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  transition: color var(--transition);
+}
+
+.textLink:hover {
+  color: var(--accent-strong);
+}
+
 .fieldHint {
   font-size: 11px;
   color: var(--text-subtle);
+}
+
+/* 找回密码：开发环境直接展示重置链接的盒子 */
+.linkBox {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+}
+
+.linkBoxTitle {
+  font-size: 11.5px;
+  color: var(--text-muted);
+}
+
+.linkBox a {
+  font-size: 11.5px;
+  line-height: 1.6;
+  color: var(--accent-strong);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  overflow-wrap: anywhere;
+}
+
+.linkBoxHint {
+  font-size: 11px;
+  color: var(--text-subtle);
+}
+
+/* 找回密码成功态的两个按钮 */
+.resultActions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.resultActions .submit {
+  flex: 1;
+}
+
+.ghostAction {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 44px;
+  padding: 0 18px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  font-size: 12.5px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  transition:
+    color var(--transition),
+    border-color var(--transition),
+    background-color var(--transition);
+}
+
+.ghostAction:hover {
+  color: var(--text);
+  border-color: var(--border-strong);
+  background: var(--surface-hover);
 }
 
 .formError {

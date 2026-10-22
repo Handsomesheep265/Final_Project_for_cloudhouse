@@ -19,14 +19,15 @@
 import { Router } from 'express'
 import type { ProductController } from '../controllers/productController'
 import { productController } from '../controllers/productController'
-import { attachDemoUserId } from '../middlewares/auth'
+import { attachAuth } from '../middlewares/auth'
 
 /** 工厂函数：便于用假 controller 起一个测试用 router */
 export function createProductRouter(controller: ProductController = productController): Router {
   const router = Router()
 
-  // 可选身份：带上 x-user-id 时详情里会多返回「我的收藏 / 我的购物车数量」
-  router.use(attachDemoUserId)
+  // 可选身份：带 token 时详情里会多返回「我的收藏 / 我的购物车数量」；
+  // 不带也能正常浏览（商品列表与详情是公开接口，不挂 requireAuth）
+  router.use(attachAuth)
 
   router.get('/', controller.listProducts)
   // 具体路径放前面，语义更清楚（Express 本身也不会把 /1/related 匹配到 /:productId）

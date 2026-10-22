@@ -44,3 +44,31 @@ export interface RegisterPayload {
   email: string
   password: string
 }
+
+/** POST /api/auth/forgot-password 的请求体 */
+export interface ForgotPasswordPayload {
+  email: string
+}
+
+/** POST /api/auth/reset-password 的请求体 */
+export interface ResetPasswordPayload {
+  /** 邮件链接里的令牌（前端从 ?token= 取） */
+  token: string
+  password: string
+}
+
+/**
+ * POST /api/auth/forgot-password 的返回。
+ * 后端永远 accepted=true（不暴露邮箱是否注册过）；devResetUrl 只在开发环境有值
+ * ——本地没接 SMTP，得把链接直接给前端才能验收。
+ */
+export interface ForgotPasswordResultVO {
+  accepted: boolean
+  expiresInMinutes: number
+  devResetUrl: string | null
+}
+
+/** POST /api/auth/reset-password 的返回 */
+export interface ResetPasswordResultVO {
+  reset: boolean
+}

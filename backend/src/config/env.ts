@@ -38,15 +38,6 @@ function readInt(key: string, fallback: number): number {
   return parsed
 }
 
-function readBool(key: string, fallback: boolean): boolean {
-  const raw = process.env[key]
-  if (raw === undefined || raw === '') return fallback
-  const normalized = raw.trim().toLowerCase()
-  if (['1', 'true', 'yes', 'on'].includes(normalized)) return true
-  if (['0', 'false', 'no', 'off'].includes(normalized)) return false
-  throw new Error(`环境变量 ${key} 必须是 true / false，当前值：${raw}`)
-}
-
 export interface DatabaseEnv {
   host: string
   port: number
@@ -61,8 +52,10 @@ export interface AuthEnv {
   jwtSecret: string
   /** 登录凭证有效期（秒） */
   tokenTtlSeconds: number
-  /** 是否允许用 x-user-id 请求头冒充登录用户（仅本地联调，生产强制关闭） */
-  allowDemoHeader: boolean
+  /** 前端站点地址：用来拼「找回密码」邮件里的重置链接 */
+  webOrigin: string
+  /** 重置密码链接有效期（分钟） */
+  resetTtlMinutes: number
 }
 
 export interface AppEnv {
@@ -103,10 +96,12 @@ export const env: AppEnv = {
   corsOrigin: readString('CORS_ORIGIN', '') || null,
   auth: {
     jwtSecret: readJwtSecret(),
-    // 默认 7 天：课程项目不做刷新 token，过期就重新登录
+    // 默认 7 天；每次调用 /api/auth/me 会重新签发并顺延，等于「常来就不用重登」
     tokenTtlSeconds: readInt('AUTH_TOKEN_TTL_HOURS', 168) * 3600,
-    // 生产环境一律关闭占位鉴权，避免任何人改个请求头就变成别人
-    allowDemoHeader: readBool('AUTH_DEMO_HEADER', !isProduction),
+    // 前端地址：只在生成「找回密码」的重置链接时用到
+    webOrigin: readString('APP_WEB_ORIGIN', 'http://127.0.0.1:5173').replace(/\/+$/, ''),
+    // 重置链接默认 30 分钟有效
+    resetTtlMinutes: readInt('AUTH_RESET_TTL_MINUTES', 30),
   },
   db: {
     host: readString('DB_HOST', '127.0.0.1'),

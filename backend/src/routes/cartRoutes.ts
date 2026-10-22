@@ -24,14 +24,14 @@
 import { Router } from 'express'
 import type { CartController } from '../controllers/cartController'
 import { cartController } from '../controllers/cartController'
-import { attachDemoUserId } from '../middlewares/auth'
+import { attachAuth, requireAuth } from '../middlewares/auth'
 
 /** 工厂函数：便于用假 controller 起一个测试用 router */
 export function createCartRouter(controller: CartController = cartController): Router {
   const router = Router()
 
-  // 鉴权（当前为占位实现，见 src/middlewares/auth.ts）
-  router.use(attachDemoUserId)
+  // 购物车是「某个用户的车」：没有登录凭证一律 401（前端拦截器会跳登录页）
+  router.use(attachAuth, requireAuth)
 
   router.get('/', controller.getCart)
   router.post('/items', controller.addItem)

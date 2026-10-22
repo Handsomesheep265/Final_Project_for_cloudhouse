@@ -1,33 +1,50 @@
 /**
  * 鉴权中间件
  * ----------------------------------------------------------------------------
- * 两种凭证来源，按优先级：
- *   1. `Authorization: Bearer <token>` —— 正式方式，token 由 /api/auth/login 签发，
- *      载荷里只有用户 ID，签名见 src/utils/token.ts；
- *   2. `x-user-id: <id>` —— 占位方式，仅本地联调用（登录页还没写完时前端靠它跑通）。
- *      生产环境由 env.auth.allowDemoHeader 强制关闭，改个请求头就能冒充别人，
- *      ⚠️ 绝不能上线。
+ * 唯一的凭证来源：`Authorization: Bearer <token>`，token 由 /api/auth/login 签发
+ * （格式与签名校验见 src/utils/token.ts）。
  *
- * 关键安全细节：只要请求带了 Authorization 头，就完全按 token 判定 ——
- * token 无效时不会回退去认 x-user-id，否则攻击者伪造一个坏 token 就能绕过校验。
+ * 两个中间件分工明确：
+ *   attachAuth  —— 解析凭证，不拦请求：
+ *                  1. 验签 + 检查过期（无状态，纯计算）；
+ *                  2. 查服务端黑名单（登出 / 改密码后的 token 必须失效）；
+ *                  3. 成功才挂 req.userId，失败记下原因继续往下走。
+ *                  给「登录可选」的接口用（例如商品列表要按登录状态返回是否已收藏）。
+ *   requireAuth —— 必须登录：没有 userId 直接 401 { code: 40102 }。
+ *                  购物车 / 订单 / 个人主页 / 登出 / me 的路由都挂它。
  *
- * 解析结果只写进 req.userId，绝不从请求体读取用户 ID，
- * 否则客户端可以伪造成别人的用户操作其购物车/订单。
+ * 为什么黑名单要在 attachAuth 里查而不是 requireAuth 里：
+ *   公开接口（如商品详情）也会用 userId 拼「我的收藏 / 我的购物车数量」，
+ *   已作废的 token 不该再被当成有效身份。
+ *
+ * 安全约定：
+ *   - userId 只来自 token，绝不从请求体 / 查询串 / 自定义请求头读取；
+ *   - 不再保留「x-user-id 冒充用户」的占位方案（见 git 历史里的 attachDemoUserId）；
+ *   - 黑名单表只存 token 的 SHA-256 指纹，不存原文。
  */
 import type { Request, RequestHandler } from 'express'
-import { env } from '../config/env'
+import { authRepository } from '../repositories/authRepositories'
 import { verifyToken } from '../utils/token'
+import { hashToken } from '../utils/token'
+import type { ApiResponse } from '../types/common'
+
+/** 未登录 / 凭证无效时的业务码（与 authService 的 unauthorized 保持一致） */
+export const UNAUTHORIZED_CODE = 40102
 
 /** 挂上 userId 的请求 */
 export interface AuthenticatedRequest extends Request {
   /** 当前登录用户 ID，只能由本中间件写入 */
   userId?: number
-  /** 凭证来源：token（正式）/ demo（x-user-id 占位）/ none（未登录） */
-  authSource?: 'token' | 'demo' | 'none'
+  /** 本次请求携带的原始 token（登出时要拿它算指纹） */
+  authToken?: string
+  /** 本次 token 的过期时间（写黑名单时用来记 expires_at） */
+  tokenExpiresAt?: Date
+  /**
+   * 凭证解析失败的原因，供 requireAuth 决定提示文案：
+   * expired = 过期；revoked = 已被登出/改密码作废；invalid = 伪造 / 格式错。
+   */
+  authError?: 'expired' | 'revoked' | 'invalid'
 }
-
-/** 临时用户 ID 请求头（仅本地联调） */
-const DEMO_USER_ID_HEADER = 'x-user-id'
 
 const BEARER_PATTERN = /^bearer\s+(\S+)$/i
 
@@ -42,41 +59,83 @@ function readBearerToken(req: Request): string | null {
 
 /**
  * 解析登录凭证并挂到 req.userId。
- * 任何失败都不在这里返回 401 —— 由各 controller 的 requireUserId 统一报 40102，
- * 这样「哪些接口必须登录」由路由/控制器决定，而不是中间件一刀切。
+ * 永不抛错、永不返回 401 —— 需要强制登录的接口由 requireAuth 负责。
+ *
+ * 是 async 的：验签之后还要查一次黑名单（数据库）。
+ * Express 5 会自动接管 async 中间件抛出的异常，这里仍然自己兜住 DB 错误，
+ * 避免一次数据库抖动把所有请求变成 500。
  */
-export const attachAuth: RequestHandler = (req, _res, next) => {
+export const attachAuth: RequestHandler = async (req, _res, next) => {
   const authenticated = req as AuthenticatedRequest
 
   const token = readBearerToken(req)
-  if (token) {
-    const result = verifyToken(token)
-    if (result.ok) {
-      authenticated.userId = result.userId
-      authenticated.authSource = 'token'
-    } else {
-      authenticated.authSource = 'none'
-      // 只记服务端日志，不回给客户端：不告诉调用方是过期还是签名错
-      console.warn(`[auth] 登录凭证无效（${result.reason}）：${req.method} ${req.originalUrl}`)
-    }
+  if (!token) {
     next()
     return
   }
 
-  if (env.auth.allowDemoHeader) {
-    const header = req.header(DEMO_USER_ID_HEADER)
-    // 格式不对（非纯数字）就当没登录，别静默放过非法值
-    if (header && /^\d+$/.test(header)) {
-      authenticated.userId = Number(header)
-      authenticated.authSource = 'demo'
-    }
+  const result = verifyToken(token)
+  if (!result.ok) {
+    authenticated.authError = result.reason === 'expired' ? 'expired' : 'invalid'
+    // 只记服务端日志，不回给客户端：不告诉调用方是过期还是签名错
+    console.warn(`[auth] 登录凭证无效（${result.reason}）：${req.method} ${req.originalUrl}`)
+    next()
+    return
   }
 
+  try {
+    // 无状态校验通过后再问一次数据库：这条 token 是否已被登出 / 被改密码作废
+    const rejected = await authRepository.isTokenRejected(
+      result.userId,
+      hashToken(token),
+      result.issuedAt,
+    )
+    if (rejected) {
+      authenticated.authError = 'revoked'
+      console.warn(`[auth] 登录凭证已被撤销：${req.method} ${req.originalUrl}`)
+      next()
+      return
+    }
+  } catch (error) {
+    // 数据库不可用时按「未登录」处理（fail closed），别把写操作放行
+    console.error('[auth] 校验登录凭证时数据库出错：', error)
+    authenticated.authError = 'invalid'
+    next()
+    return
+  }
+
+  authenticated.userId = result.userId
+  authenticated.authToken = token
+  authenticated.tokenExpiresAt = result.expiresAt
   next()
 }
 
 /**
- * 旧名字，保留是为了不改购物车 / 订单 / 个人主页路由里的 router.use(...)。
- * 行为已经升级成「Bearer token + x-user-id 占位」，那两个模块因此自动支持正式登录。
+ * 必须登录。
+ * 挂在需要用户身份的 router 上，形如：
+ *     router.use(attachAuth, requireAuth)
+ *
+ * 直接返回统一响应体（而不是抛错），因为这是「网关级」判断，
+ * 不需要经过业务错误类；状态码与错误码都和 authService 的 40102 对齐，
+ * 前端拦截器只认 401 就能统一处理。
  */
-export const attachDemoUserId: RequestHandler = attachAuth
+export const requireAuth: RequestHandler = (req, res, next) => {
+  const { userId, authError } = req as AuthenticatedRequest
+  if (typeof userId === 'number' && Number.isInteger(userId) && userId > 0) {
+    next()
+    return
+  }
+
+  const messages: Record<'expired' | 'revoked' | 'invalid', string> = {
+    expired: '登录状态已过期，请重新登录',
+    revoked: '登录状态已失效，请重新登录',
+    invalid: '登录凭证无效，请重新登录',
+  }
+
+  const body: ApiResponse<null> = {
+    code: UNAUTHORIZED_CODE,
+    message: authError ? messages[authError] : '请先登录',
+    data: null,
+  }
+  res.status(401).json(body)
+}

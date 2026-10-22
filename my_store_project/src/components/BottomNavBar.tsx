@@ -1,7 +1,7 @@
 import { NavLink } from 'react-router-dom'
 import type { NavKey } from '../types'
 import { ROUTES, loginPath } from '../router/paths'
-import { isLoggedIn } from '../utils/authSession'
+import { selectAuthStatus, useAuthStore } from '../stores/authStore'
 import type { IconComponent } from './Icons'
 import { CartIcon, HomeIcon, UserIcon } from './Icons'
 import styles from './BottomNavBar.module.css'
@@ -36,7 +36,8 @@ export interface BottomNavBarProps {
 }
 
 export default function BottomNavBar({ cartCount = 0 }: BottomNavBarProps) {
-  const loggedIn = isLoggedIn()
+  // 订阅全局登录态：登录 / 退出后导航栏目标立刻跟着变（不需要刷新页面）
+  const loggedIn = useAuthStore(selectAuthStatus) === 'authenticated'
 
   return (
     <nav className={styles.bar} aria-label="底部导航">
@@ -48,6 +49,8 @@ export default function BottomNavBar({ cartCount = 0 }: BottomNavBarProps) {
           // 个人主页要先登录：没有登录凭证时先去 /login，登录成功后登录页会跳回 /profile
           const target =
             item.key === 'profile' && !loggedIn ? loginPath(ROUTES.profile) : item.to
+          // 未登录时我们人在登录页，但「个人主页」这一项不该跟着高亮（会让用户以为已经在主页了）
+          const suppressActive = item.key === 'profile' && !loggedIn
 
           const content = (
             <>
@@ -68,7 +71,9 @@ export default function BottomNavBar({ cartCount = 0 }: BottomNavBarProps) {
                   to={target}
                   end
                   className={({ isActive }) =>
-                    isActive ? `${styles.item} ${styles.itemActive}` : styles.item
+                    isActive && !suppressActive
+                      ? `${styles.item} ${styles.itemActive}`
+                      : styles.item
                   }
                 >
                   {content}

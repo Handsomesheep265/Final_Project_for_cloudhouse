@@ -22,14 +22,14 @@
 import { Router } from 'express'
 import type { OrderController } from '../controllers/orderController'
 import { orderController } from '../controllers/orderController'
-import { attachDemoUserId } from '../middlewares/auth'
+import { attachAuth, requireAuth } from '../middlewares/auth'
 
 /** 工厂函数：便于用假 controller 起一个测试用 router */
 export function createOrderRouter(controller: OrderController = orderController): Router {
   const router = Router()
 
-  // 鉴权（当前为占位实现，见 src/middlewares/auth.ts）
-  router.use(attachDemoUserId)
+  // 订单只属于下单用户：没有登录凭证一律 401（前端拦截器会跳登录页）
+  router.use(attachAuth, requireAuth)
 
   router.post('/', controller.createOrder)
   router.get('/', controller.listOrders)

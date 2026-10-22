@@ -18,6 +18,10 @@ export const ROUTES = {
   login: '/login',
   /** 注册页（同一套 UI，切换 tab 即可） */
   register: '/register',
+  /** 找回密码：填邮箱申请重置链接 */
+  forgotPassword: '/forgot-password',
+  /** 设置新密码（邮件链接里的 ?token= 会带过来） */
+  resetPassword: '/reset-password',
   /** 商品详情（列表前缀，实际地址用 productPath() 拼） */
   products: '/products',
   /** 搜索结果页（?keyword= 由页面自己写进 URL） */

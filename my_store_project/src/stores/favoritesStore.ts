@@ -11,10 +11,16 @@
  *
  * 交互策略：
  *   点击时先乐观更新（爱心立刻变），接口失败再回滚并重新拉一次，避免停留在错误状态。
+ *
+ * 与登录态的关系：
+ *   - 未登录时收藏接口返回 401，refresh 直接按「没有收藏」处理，不发请求；
+ *   - toggle 在未登录时抛 40102 —— 页面的爱心按钮通常已被 useLoginGate 拦下，
+ *     这里是第二道保险；退登时页面会调用 reset() 清掉上一个账号的收藏。
  */
 import { create } from 'zustand'
 import { ApiError } from '../api/client'
 import { profileApi } from '../api/profile'
+import { isAuthenticatedNow, loginRequiredError } from './authStore'
 import type { FavoriteItemVO } from '../types/profile'
 
 /** 一次性最多加载多少条收藏（个人主页只展示最近这些；后端上限 50） */
@@ -36,10 +42,12 @@ interface FavoritesState {
 }
 
 interface FavoritesActions {
-  /** 拉取收藏（进入首页 / 个人主页时调用） */
+  /** 拉取收藏（进入首页 / 个人主页时调用）；未登录时清空本地，不发请求 */
   refresh: () => Promise<void>
   /** 收藏 / 取消收藏，返回操作后的状态；失败会回滚并抛出 */
   toggle: (productId: number) => Promise<boolean>
+  /** 清空本地状态（退出登录时调用） */
+  reset: () => void
 }
 
 export interface FavoritesStore extends FavoritesState, FavoritesActions {}
@@ -69,6 +77,12 @@ export const useFavoritesStore = create<FavoritesStore>()((set, get) => {
     pending: new Set<number>(),
 
     refresh: async () => {
+      if (!isAuthenticatedNow()) {
+        // 未登录：收藏接口是 401 的，本地按「没有收藏」处理，爱心保持空心
+        set({ items: [], ids: new Set<number>(), total: 0, status: 'idle', error: null })
+        return
+      }
+
       set({ status: 'loading' })
       try {
         const result = await profileApi.listFavorites({ page: 1, pageSize: MAX_LOADED_FAVORITES })
@@ -78,7 +92,16 @@ export const useFavoritesStore = create<FavoritesStore>()((set, get) => {
       }
     },
 
+    reset: () => {
+      applyList([], 0)
+      set({ status: 'idle', error: null, pending: new Set<number>() })
+    },
+
     toggle: async (productId) => {
+      if (!isAuthenticatedNow()) {
+        throw loginRequiredError('请先登录后再收藏商品')
+      }
+
       const { ids, items, pending } = get()
       // 同一个商品正在提交时不重复点击
       if (pending.has(productId)) return ids.has(productId)

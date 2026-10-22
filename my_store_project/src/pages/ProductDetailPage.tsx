@@ -8,6 +8,8 @@ import { ApiError } from '../api/client'
 import { productApi } from '../api/product'
 import { selectTotalQuantity, useCartStore } from '../stores/cartStore'
 import { selectFavoriteIds, useFavoritesStore } from '../stores/favoritesStore'
+import { selectAuthStatus, useAuthStore } from '../stores/authStore'
+import { useLoginGate } from '../utils/useLoginGate'
 import type { ProductDetailVO, RelatedProductVO } from '../types/product'
 import { formatPrice } from '../utils/format'
 import { resolveImageUrl } from '../utils/assetUrl'
@@ -46,6 +48,10 @@ function toMessage(error: unknown, fallback: string): string {
 export default function ProductDetailPage() {
   const { productId = '' } = useParams()
   const id = Number(productId)
+
+  /** 详情页是公开的，但收藏 / 加购需要登录：未登录先跳登录页（登录后回到本商品） */
+  const requireLogin = useLoginGate()
+  const authStatus = useAuthStore(selectAuthStatus)
 
   const addItem = useCartStore((state) => state.addItem)
   const fetchCart = useCartStore((state) => state.fetchCart)
@@ -108,13 +114,14 @@ export default function ProductDetailPage() {
   }, [load])
 
   // 收藏状态与首页/个人主页共用；购物车角标也顺手刷新一次
+  // 登录状态变化时同步刷新：未登录时这两个 store 只清本地、不发请求
   useEffect(() => {
     void refreshFavorites()
-  }, [refreshFavorites])
+  }, [refreshFavorites, authStatus])
 
   useEffect(() => {
     void fetchCart()
-  }, [fetchCart])
+  }, [fetchCart, authStatus])
 
   useEffect(() => {
     if (!note) return undefined
@@ -139,6 +146,7 @@ export default function ProductDetailPage() {
 
   const handleToggleFavorite = useCallback(async () => {
     if (!detail) return
+    if (!requireLogin('收藏商品')) return
 
     try {
       const favorited = await toggleFavorite(detail.id)
@@ -147,10 +155,11 @@ export default function ProductDetailPage() {
     } catch (error) {
       setNote({ text: toMessage(error, '操作失败，请稍后重试'), tone: 'error' })
     }
-  }, [detail, toggleFavorite])
+  }, [detail, requireLogin, toggleFavorite])
 
   const handleAddToCart = useCallback(async () => {
     if (!detail) return
+    if (!requireLogin('加入购物车')) return
 
     setAdding(true)
     try {
@@ -161,7 +170,7 @@ export default function ProductDetailPage() {
     } finally {
       setAdding(false)
     }
-  }, [addItem, detail])
+  }, [addItem, detail, requireLogin])
 
   const offShelf = detail ? detail.status !== 1 : false
   const soldOut = detail ? detail.stock <= 0 : false

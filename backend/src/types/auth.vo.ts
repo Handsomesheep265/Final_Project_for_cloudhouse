@@ -28,3 +28,22 @@ export interface AuthSessionVO {
   expiresAt: string
   user: AuthUserVO
 }
+
+/**
+ * POST /api/auth/forgot-password 的返回。
+ * 永远 accepted=true（不泄露邮箱是否注册过）；只有非生产环境才带 devResetUrl，
+ * 因为本地没配 SMTP，得把链接直接给前端才能验收。
+ */
+export interface ForgotPasswordResultVO {
+  accepted: boolean
+  /** 链接有效期（分钟） */
+  expiresInMinutes: number
+  /** 仅开发环境：可直接打开的重置链接 */
+  devResetUrl: string | null
+}
+
+/** POST /api/auth/reset-password 的返回 */
+export interface ResetPasswordResultVO {
+  /** 密码已重置，前端引导用户去登录 */
+  reset: boolean
+}

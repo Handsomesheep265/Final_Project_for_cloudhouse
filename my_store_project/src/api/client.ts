@@ -1,24 +1,9 @@
 import type { ApiResponse } from '../types/cart'
-import { getToken } from '../utils/authSession'
+import { clearSession, getToken } from '../utils/authSession'
+import { notifyUnauthorized } from '../utils/authEvents'
 
 /** 后端地址：默认本地 3000，可用 .env 里的 VITE_API_BASE 覆盖 */
 export const API_BASE = (import.meta.env.VITE_API_BASE ?? 'http://127.0.0.1:3000').replace(/\/+$/, '')
-
-/**
- * 临时鉴权占位：与后端 x-user-id 方案对应，只在「还没登录」时生效。
- *
- * 已经从登录页拿到 token 后，请求会自动改带 `Authorization: Bearer <token>`，
- * 不再发 x-user-id —— 后端也只有「没有 Authorization 头」时才回退看 x-user-id。
- * 等全局登录态做完，这里改成一个 store 取值即可，调用方不用动。
- */
-export const DEMO_USER_ID = 1
-
-/** 拼鉴权请求头：有 token 用 token，没有才退回占位用户 */
-function authHeaders(): Record<string, string> {
-  const token = getToken()
-  if (token) return { authorization: `Bearer ${token}` }
-  return { 'x-user-id': String(DEMO_USER_ID) }
-}
 
 /** 统一的接口错误：code 为后端业务码，网络失败时为 -1 */
 export class ApiError extends Error {
@@ -33,21 +18,46 @@ export class ApiError extends Error {
     this.status = options.status
     this.isNetworkError = options.isNetworkError ?? false
   }
+
+  /** 401：没登录 / 凭证过期，调用方一般不用自己判断，拦截器已经处理过跳转 */
+  get isUnauthorized(): boolean {
+    return this.status === 401
+  }
 }
 
 interface RequestOptions {
   method?: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE'
   body?: unknown
+  /**
+   * 401 时不做全局跳转（默认会：清凭证 + 跳登录页）。
+   * 只给「登录 / 注册 / 启动时的身份校验」用 —— 它们的 401 属于正常业务失败，
+   * 不应该被当成「登录态失效」把用户踢走。
+   */
+  silentUnauthorized?: boolean
+}
+
+/** 这两个接口的 401 表示「账号或密码不对」，不是登录态失效 */
+const CREDENTIAL_PATHS = ['/api/auth/login', '/api/auth/register']
+
+function isCredentialCheck(path: string): boolean {
+  return CREDENTIAL_PATHS.some((prefix) => path.startsWith(prefix))
+}
+
+/** 拼鉴权头：有 token 就带 Bearer，没有就不带（公开接口照样能访问） */
+function authHeaders(): Record<string, string> {
+  const token = getToken()
+  return token ? { authorization: `Bearer ${token}` } : {}
 }
 
 /**
  * 统一请求封装：
- *   - 自动带鉴权头（有 token 用 Authorization，否则退回 x-user-id）与 JSON 头
+ *   - 自动带 Authorization: Bearer <token>（没有 token 就是匿名请求）
  *   - 解析 { code, message, data }，code !== 0 时抛 ApiError
+ *   - 401 全局拦截：清本地凭证 → 通知 AuthBootstrap 跳登录页（登录页会记住来的位置）
  *   - 网络不通（后端没启动）也转成 ApiError，页面可以给出可读提示
  */
 export async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
-  const { method = 'GET', body } = options
+  const { method = 'GET', body, silentUnauthorized = false } = options
 
   let response: Response
   try {
@@ -75,6 +85,12 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
   }
 
   if (!response.ok || payload === null || payload.code !== 0) {
+    // 401 = 没登录 / token 过期：清掉本地凭证并交给全局拦截器处理
+    if (response.status === 401 && !silentUnauthorized && !isCredentialCheck(path)) {
+      clearSession()
+      notifyUnauthorized(payload?.message)
+    }
+
     throw new ApiError(payload?.message ?? `请求失败（HTTP ${response.status}）`, {
       code: payload?.code ?? -1,
       status: response.status,

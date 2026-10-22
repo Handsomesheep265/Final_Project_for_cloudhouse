@@ -8,6 +8,8 @@ import { ALL_CATEGORY_ID, applyProductFilters, pickRecommended } from '../utils/
 import { toNavCategory, toProductCard } from '../utils/productAdapter'
 import { useCartStore, selectTotalQuantity } from '../stores/cartStore'
 import { selectFavoriteIds, useFavoritesStore } from '../stores/favoritesStore'
+import { selectAuthStatus, useAuthStore } from '../stores/authStore'
+import { useLoginGate } from '../utils/useLoginGate'
 import { ApiError } from '../api/client'
 import { categoryApi } from '../api/category'
 import { productApi } from '../api/product'
@@ -43,6 +45,10 @@ const ALL_CATEGORY: Category = { id: ALL_CATEGORY_ID, name: '全部', parentId: 
 export default function Homepage() {
   const { theme, toggleTheme } = useTheme()
   const navigate = useNavigate()
+  /** 未登录时点收藏 / 加购会跳登录页（登录后回到首页） */
+  const requireLogin = useLoginGate()
+  /** 登录状态变化（登录、退出、过期）后重新拉购物车与收藏 */
+  const authStatus = useAuthStore(selectAuthStatus)
 
   // 购物车（Zustand + 后端接口）：角标订阅服务端汇总的件数
   const addToCart = useCartStore((state) => state.addItem)
@@ -54,15 +60,15 @@ export default function Homepage() {
   const toggleFavorite = useFavoritesStore((state) => state.toggle)
   const refreshFavorites = useFavoritesStore((state) => state.refresh)
 
-  // 进入首页时拉一次购物车，用于底部角标（失败也不阻塞首页）
+  // 进入首页（以及登录状态变化）时刷新购物车与收藏：未登录时两个 store 会直接清空、不发请求
   useEffect(() => {
     void fetchCart()
-  }, [fetchCart])
+  }, [fetchCart, authStatus])
 
   // 收藏同理：拉不到就当作全未收藏，爱心按未选中展示
   useEffect(() => {
     void refreshFavorites()
-  }, [refreshFavorites])
+  }, [refreshFavorites, authStatus])
 
   // 顶部导航栏
   const [keyword, setKeyword] = useState('')
@@ -175,9 +181,11 @@ export default function Homepage() {
       ? null
       : (categories.find((category) => category.id === activeCategoryId)?.name ?? null)
 
-  // 收藏走真实接口（与个人主页共用状态）：失败时给出后端文案
+  // 收藏走真实接口（与个人主页共用状态）：未登录先去登录，失败时给出后端文案
   const handleToggleFavorite = useCallback(
     (productId: number) => {
+      if (!requireLogin('收藏商品')) return
+
       void (async () => {
         try {
           await toggleFavorite(productId)
@@ -189,12 +197,14 @@ export default function Homepage() {
         }
       })()
     },
-    [toggleFavorite],
+    [requireLogin, toggleFavorite],
   )
 
-  // 加购走真实接口：成功/失败都用同一处 toast 反馈（例如库存不足时显示后端文案）
+  // 加购走真实接口：未登录先去登录；成功/失败都用同一处 toast 反馈（例如库存不足时显示后端文案）
   const handleAddToCart = useCallback(
     (product: Product) => {
+      if (!requireLogin('加入购物车')) return
+
       void (async () => {
         try {
           await addToCart(product.id)
@@ -207,7 +217,7 @@ export default function Homepage() {
         }
       })()
     },
-    [addToCart],
+    [addToCart, requireLogin],
   )
 
   // 回车 / 点「搜索」进入搜索结果页（无刷新跳转，列表数据走 /api/search）

@@ -5,6 +5,12 @@
   background: var(--bg);
 }
 
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .editBtn {
   height: 28px;
   padding: 0 12px;
@@ -23,6 +29,26 @@
   color: var(--text);
   border-color: var(--border-strong);
   background: var(--surface-hover);
+}
+
+.logoutBtn {
+  height: 28px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  font-size: 12px;
+  color: var(--text-subtle);
+  transition:
+    color var(--transition),
+    border-color var(--transition),
+    background-color var(--transition);
+}
+
+.logoutBtn:hover {
+  color: var(--danger);
+  border-color: color-mix(in srgb, var(--danger) 32%, transparent);
+  background: color-mix(in srgb, var(--danger) 7%, transparent);
 }
 
 .main {
