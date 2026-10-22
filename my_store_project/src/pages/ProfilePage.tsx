@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, Navigate } from 'react-router-dom'
 import BottomNavBar from '../components/BottomNavBar'
 import PageHeader from '../components/PageHeader'
 import ProductThumb from '../components/ProductThumb'
@@ -18,7 +18,8 @@ import {
 import type { ProfileVO, SellerProductVO } from '../types/profile'
 import { formatDateTime, formatPrice } from '../utils/format'
 import { resolveImageUrl } from '../utils/assetUrl'
-import { ROUTES } from '../router/paths'
+import { isLoggedIn } from '../utils/authSession'
+import { ROUTES, loginPath } from '../router/paths'
 import styles from './ProfilePage.module.css'
 
 /** 提示浮层停留时间 */
@@ -63,6 +64,17 @@ function validateForm(form: EditForm): string | null {
  * 空串表示清空（后端会把 null 写库），保存成功后用返回的完整资料替换本地状态。
  */
 export default function ProfilePage() {
+  // 还没做全局登录态，这里先做最小守卫：本地没有有效 token 就送回登录页，
+  // 登录成功后由 ?next= 跳回 /profile。换成全局 store 时只改这一处判断。
+  if (!isLoggedIn()) {
+    return <Navigate to={loginPath(ROUTES.profile)} replace />
+  }
+
+  return <ProfileContent />
+}
+
+/** 页面主体：只有在「已登录」时才会渲染 */
+function ProfileContent() {
   const cartCount = useCartStore(selectTotalQuantity)
   const addToCart = useCartStore((state) => state.addItem)
   const fetchCart = useCartStore((state) => state.fetchCart)

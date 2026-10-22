@@ -1,13 +1,24 @@
 import type { ApiResponse } from '../types/cart'
+import { getToken } from '../utils/authSession'
 
 /** 后端地址：默认本地 3000，可用 .env 里的 VITE_API_BASE 覆盖 */
 export const API_BASE = (import.meta.env.VITE_API_BASE ?? 'http://127.0.0.1:3000').replace(/\/+$/, '')
 
 /**
- * 临时鉴权占位：与后端 cartRoutes.ts 的 x-user-id 方案对应。
- * 登录功能落地后改成从 token / context 里取，这里只保留一个入口。
+ * 临时鉴权占位：与后端 x-user-id 方案对应，只在「还没登录」时生效。
+ *
+ * 已经从登录页拿到 token 后，请求会自动改带 `Authorization: Bearer <token>`，
+ * 不再发 x-user-id —— 后端也只有「没有 Authorization 头」时才回退看 x-user-id。
+ * 等全局登录态做完，这里改成一个 store 取值即可，调用方不用动。
  */
 export const DEMO_USER_ID = 1
+
+/** 拼鉴权请求头：有 token 用 token，没有才退回占位用户 */
+function authHeaders(): Record<string, string> {
+  const token = getToken()
+  if (token) return { authorization: `Bearer ${token}` }
+  return { 'x-user-id': String(DEMO_USER_ID) }
+}
 
 /** 统一的接口错误：code 为后端业务码，网络失败时为 -1 */
 export class ApiError extends Error {
@@ -31,7 +42,7 @@ interface RequestOptions {
 
 /**
  * 统一请求封装：
- *   - 自动带 x-user-id 与 JSON 头
+ *   - 自动带鉴权头（有 token 用 Authorization，否则退回 x-user-id）与 JSON 头
  *   - 解析 { code, message, data }，code !== 0 时抛 ApiError
  *   - 网络不通（后端没启动）也转成 ApiError，页面可以给出可读提示
  */
@@ -43,7 +54,7 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
     response = await fetch(`${API_BASE}${path}`, {
       method,
       headers: {
-        'x-user-id': String(DEMO_USER_ID),
+        ...authHeaders(),
         ...(body === undefined ? {} : { 'content-type': 'application/json' }),
       },
       body: body === undefined ? undefined : JSON.stringify(body),

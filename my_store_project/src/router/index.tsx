@@ -1,5 +1,6 @@
 import { Navigate, createBrowserRouter } from 'react-router-dom'
 import Homepage from '../pages/Homepage'
+import AuthPage from '../pages/AuthPage'
 import CartPage from '../pages/CartPage'
 import CheckoutPage from '../pages/CheckoutPage'
 import OrdersPage from '../pages/OrdersPage'
@@ -17,7 +18,9 @@ import { ROUTES } from './paths'
  * - `/checkout`      确认订单（收货信息 + 商品清单 + 提交）
  * - `/orders`        我的订单（分页 + 状态筛选）
  * - `/orders/:orderNo` 订单详情（链接统一用 paths.ts 的 orderDetailPath 生成）
- * - `/profile`       个人主页（资料 + 收藏 + 我发布的商品）
+ * - `/profile`       个人主页（资料 + 收藏 + 我发布的商品；未登录会被送回 /login）
+ * - `/login`         登录（?next= 指定登录后回到哪个页面）
+ * - `/register`      注册（与登录同一套 UI，靠路径区分模式）
  * - `/products/:productId` 商品详情（链接统一用 paths.ts 的 productPath 生成）
  * - `/search?keyword=手帐` 搜索结果（商品 + 店铺）
  * - `*`              尚未实现的地址统一回首页，避免直接输入 /profile 之类路径时出现空白页
@@ -49,6 +52,14 @@ export const router = createBrowserRouter([
   {
     path: ROUTES.profile,
     element: <ProfilePage />,
+  },
+  {
+    path: ROUTES.login,
+    element: <AuthPage />,
+  },
+  {
+    path: ROUTES.register,
+    element: <AuthPage />,
   },
   {
     path: `${ROUTES.products}/:productId`,

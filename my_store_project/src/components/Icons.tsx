@@ -188,3 +188,45 @@ export function CheckIcon(props: IconProps) {
     </Svg>
   )
 }
+
+/* ---------------------------------------------------------------------------
+   登录 / 注册页用到的小图标
+   --------------------------------------------------------------------------- */
+
+export function MailIcon(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <rect x="3.2" y="5.4" width="17.6" height="13.2" rx="2.4" />
+      <path d="m4 7.2 7.1 5.1a1.6 1.6 0 0 0 1.8 0L20 7.2" />
+    </Svg>
+  )
+}
+
+export function LockIcon(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <rect x="4.6" y="10.4" width="14.8" height="9.2" rx="2.2" />
+      <path d="M8.4 10.4V8a3.6 3.6 0 0 1 7.2 0v2.4" />
+    </Svg>
+  )
+}
+
+export function EyeIcon(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M2.6 12S5.9 5.8 12 5.8 21.4 12 21.4 12 18.1 18.2 12 18.2 2.6 12 2.6 12Z" />
+      <circle cx="12" cy="12" r="2.9" />
+    </Svg>
+  )
+}
+
+export function EyeOffIcon(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M4 4.4 20 20" />
+      <path d="M9.6 6.3A8.9 8.9 0 0 1 12 6c6.1 0 9.4 6 9.4 6a15.7 15.7 0 0 1-3.2 3.8" />
+      <path d="M6.4 8A15.4 15.4 0 0 0 2.6 12S5.9 18 12 18a9.4 9.4 0 0 0 3.4-.6" />
+      <path d="M10.2 10.3a2.9 2.9 0 0 0 4 4" />
+    </Svg>
+  )
+}
