@@ -25,7 +25,8 @@ import {
 import { ApiError } from '../api/client'
 import { formatPrice } from '../utils/format'
 import { ROUTES, productPath } from '../router/paths'
-import styles from './CartPage.module.css'
+import styles from './CartPage.module.css'//导入了各种组件、各种图标、核心状态管理工具和页面样式......
+
 
 /** 操作提示浮层的停留时间 */
 const NOTE_DURATION = 2400
@@ -38,7 +39,7 @@ const NOTE_DURATION = 2400
  *   - 数量增减 / 勾选 / 删除 都会重新拉取整车数据，金额不会出现两边不一致。
  * 「去结算」跳到 /checkout（确认订单页），真正下单由那边的 POST /api/orders 完成。
  */
-export default function CartPage() {
+export default function CartPage() {//给购物车下达指令，让它去仓库拉取数据，并告诉它怎么响应我们的操作。
   const navigate = useNavigate()
 
   const items = useCartStore(selectItems)
@@ -46,6 +47,7 @@ export default function CartPage() {
   const loadError = useCartStore(selectLoadError)
   const mutating = useCartStore(selectMutating)
 
+  //此处开始绑定一系列操作
   const fetchCart = useCartStore((state) => state.fetchCart)
   const toggleSelected = useCartStore((state) => state.toggleSelected)
   const setAllSelected = useCartStore((state) => state.setAllSelected)
@@ -59,7 +61,7 @@ export default function CartPage() {
   const selectedAmount = useCartStore(selectSelectedAmount)
   const allSelected = useCartStore(selectAllSelected)
 
-  const [note, setNote] = useState<{ text: string; tone: 'info' | 'error' } | null>(null)
+  const [note, setNote] = useState<{ text: string; tone: 'info' | 'error' } | null>(null)//创建了一个note的小变量，用来存提示信息（成功/错误）
 
   // 进入页面时拉取购物车
   useEffect(() => {
@@ -70,7 +72,7 @@ export default function CartPage() {
     if (!note) return undefined
     const timer = window.setTimeout(() => setNote(null), NOTE_DURATION)
     return () => window.clearTimeout(timer)
-  }, [note])
+  }, [note])//当note有值时，设置一个定时器，NOTE_DURATION后清空note。与第32行相对应。
 
   /** 统一包装写操作：失败时把后端文案（如库存不足）展示出来 */
   const run = useCallback(
@@ -86,15 +88,19 @@ export default function CartPage() {
       }
     },
     [],
-  )
+  )//该run函数是一个很聪明的包装器，接收一个task函数和一个可选的successText字符串。它会执行task函数，如果成功则显示successText，如果失败则显示错误信息。
+  //整个购物车页面的所有操作都可以交给run函数来处理，统一处理成功或者错误的信息，便于维护。
 
   const handleCheckout = () => {
     if (selectedQuantity === 0) return
     navigate(ROUTES.checkout)
   }
 
-  const isLoading = status === 'loading' && items.length === 0
-  const isEmpty = status !== 'error' && !isLoading && items.length === 0
+  const isLoading = status === 'loading' && items.length === 0//如果状态是loading并且购物车为空，则说明正在加载购物车数据
+  const isEmpty = status !== 'error' && !isLoading && items.length === 0 //如果状态不是error并且不是loading并且购物车为空，则说明购物车是空的
+//上面这一层为“诊断层”，用以诊断当前购物车页面处于何种状态
+
+//下面这一层为“渲染层”，根据诊断结果渲染不同的HTML结构。注意，渲染层的逻辑是“互斥”的，即每个状态只会渲染一个分支。
 
   return (
     <div className={styles.page}>
@@ -168,7 +174,7 @@ export default function CartPage() {
             </div>
 
             <ul className={styles.list}>
-              {items.map((item) => (
+              {items.map((item) => (//把商品（items）数组中的商品（item）元素都遍历一遍，按照下面的HTML结构模板渲染出来。
                 <li key={item.productId} className={styles.row}>
                   <label className={styles.check}>
                     <input
