@@ -239,3 +239,32 @@ export function SendIcon(props: IconProps) {
     </Svg>
   )
 }
+
+export function ChevronRightIcon(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="m9.5 6 5.5 6-5.5 6" />
+    </Svg>
+  )
+}
+
+export function HistoryIcon(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M3.6 12a8.4 8.4 0 1 0 2.6-6.1" />
+      <path d="M3.6 4.6v4.2h4.2" />
+      <path d="M12 7.8V12l3 1.9" />
+    </Svg>
+  )
+}
+
+export function TrashIcon(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M4.4 6.6h15.2" />
+      <path d="M9.4 6.6V5a1.2 1.2 0 0 1 1.2-1.2h2.8A1.2 1.2 0 0 1 14.6 5v1.6" />
+      <path d="M6.4 6.6l.8 12a1.4 1.4 0 0 0 1.4 1.3h6.8a1.4 1.4 0 0 0 1.4-1.3l.8-12" />
+      <path d="M10.4 10.4v6M13.6 10.4v6" />
+    </Svg>
+  )
+}

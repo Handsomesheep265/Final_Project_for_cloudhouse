@@ -1,8 +1,12 @@
 /* ==========================================================================
    AI 手帐助手 · 聊天页
    --------------------------------------------------------------------------
-   布局：整页固定高度（100svh）→ 页头 + 可滚动消息区 + 固定底部输入条。
-   不显示底部导航：聊天时输入条就是主操作，避免三套「底部栏」打架。
+   布局：整页固定高度（100svh）
+     → 页头
+     → 主体（左侧历史侧边栏 + 右侧聊天列）
+     → 聊天列内：消息区（滚动） + 输入条（贴底，不再 fixed）
+   桌面端侧边栏常驻；< 880px 时侧边栏变成抽屉，由页头「历史」按钮开合。
+   不显示底部导航：聊天时输入条就是主操作，避免两套「底部栏」打架。
    ========================================================================== */
 
 .page {
@@ -10,6 +14,275 @@
   flex-direction: column;
   height: 100svh;
   background: var(--bg);
+}
+
+/* 页头 + 主体：主体撑满剩余高度，左右两栏各自滚动 */
+.body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+}
+
+.chatColumn {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+/* 页头的「历史」按钮：只在小屏出现（桌面端侧边栏本来就在） */
+.historyToggle {
+  display: none;
+  align-items: center;
+  gap: 4px;
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  font-size: 12px;
+  color: var(--text-muted);
+  transition:
+    color var(--transition),
+    border-color var(--transition),
+    background-color var(--transition);
+}
+
+.historyToggle:hover {
+  color: var(--text);
+  border-color: var(--border-strong);
+  background: var(--surface-hover);
+}
+
+/* 抽屉遮罩：只在窄屏显示 */
+.backdrop {
+  display: none;
+}
+
+/* ------------------------------ 历史侧边栏 ------------------------------ */
+
+.sidebar {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: 8px;
+  width: 264px;
+  min-height: 0;
+  padding: 14px 12px;
+  border-right: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.sidebarHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0 2px 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.sidebarTitle {
+  font-size: 13px;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+  color: var(--text);
+}
+
+.newBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid color-mix(in srgb, var(--accent) 26%, transparent);
+  border-radius: var(--radius-pill);
+  background: var(--accent-soft);
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--accent-strong);
+  transition: background-color var(--transition);
+}
+
+.newBtn:hover {
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+}
+
+.conversationList {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 4px;
+  min-height: 0;
+  padding: 2px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.conversationItem {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  transition:
+    background-color var(--transition),
+    border-color var(--transition);
+}
+
+.conversationItem:hover {
+  background: var(--surface-hover);
+}
+
+.conversationItemActive,
+.conversationItemActive:hover {
+  border-color: color-mix(in srgb, var(--accent) 30%, transparent);
+  background: var(--accent-soft);
+}
+
+.conversationMain {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px;
+  border-radius: var(--radius-sm);
+  text-align: left;
+}
+
+.conversationTitle {
+  overflow: hidden;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.conversationMeta {
+  font-size: 10.5px;
+  color: var(--text-subtle);
+  font-variant-numeric: tabular-nums;
+}
+
+.conversationDelete {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 26px;
+  height: 26px;
+  margin-right: 4px;
+  border-radius: 50%;
+  color: var(--text-subtle);
+  transition:
+    color var(--transition),
+    background-color var(--transition);
+}
+
+.conversationDelete:hover:not(:disabled) {
+  color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 10%, transparent);
+}
+
+.conversationDelete:disabled {
+  opacity: 0.5;
+}
+
+/* 删除前的二次确认：占用删除按钮的位置，不弹出系统对话框 */
+.confirm {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding-right: 4px;
+}
+
+.confirmDelete {
+  height: 24px;
+  padding: 0 8px;
+  border-radius: var(--radius-pill);
+  background: var(--danger);
+  font-size: 10.5px;
+  font-weight: 600;
+  color: #fff;
+  white-space: nowrap;
+}
+
+.confirmDelete:disabled {
+  opacity: 0.6;
+}
+
+.confirmCancel {
+  height: 24px;
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  font-size: 10.5px;
+  color: var(--text-muted);
+}
+
+.confirmCancel:hover {
+  border-color: var(--border-strong);
+  background: var(--surface-hover);
+}
+
+.sidebarHint {
+  padding: 14px 8px;
+  font-size: 11.5px;
+  color: var(--text-subtle);
+  text-align: center;
+}
+
+.sidebarEmpty {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 18px 8px;
+  text-align: center;
+}
+
+.sidebarEmptyTitle {
+  font-size: 12.5px;
+  font-weight: 650;
+  color: var(--text-muted);
+}
+
+.sidebarEmptyText {
+  font-size: 11px;
+  line-height: 1.6;
+  color: var(--text-subtle);
+}
+
+.sidebarLink {
+  display: inline-flex;
+  align-items: center;
+  align-self: center;
+  height: 28px;
+  margin-top: 4px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--accent);
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text-on-accent);
+  cursor: pointer;
+  transition: background-color var(--transition);
+}
+
+.sidebarLink:hover {
+  background: var(--accent-strong);
+}
+
+.sidebarError {
+  padding: 8px;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--danger);
+  text-align: center;
 }
 
 /* ------------------------------ 消息区 ------------------------------ */
@@ -22,7 +295,7 @@
   width: 100%;
   max-width: 760px;
   margin: 0 auto;
-  padding: 14px 24px 132px;
+  padding: 14px 24px 12px;
   overflow-y: auto;
   overscroll-behavior: contain;
 }
@@ -67,13 +340,26 @@
   color: var(--accent-strong);
 }
 
+/* 气泡 + 商品卡共用的列容器：宽度限制在这一层，气泡和卡片就都对齐了 */
+.messageBody {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  max-width: min(78%, 560px);
+}
+
+.messageBodyUser {
+  align-items: flex-end;
+}
+
 /* 气泡基础样式：助手在左（浅色卡片），用户在右（主色） */
 .bubbleAssistant,
 .bubbleUser {
   display: flex;
   flex-direction: column;
   gap: 3px;
-  max-width: min(78%, 560px);
+  max-width: 100%;
   padding: 10px 13px;
   border-radius: var(--radius-md);
   font-size: 13px;
@@ -94,6 +380,135 @@
   border-bottom-right-radius: 6px;
   background: var(--accent);
   color: var(--text-on-accent);
+}
+
+/* 错误提示（接口挂了 / 参数不合法）：用危险色区分，但仍保持可读 */
+.bubbleError {
+  border-color: color-mix(in srgb, var(--danger) 30%, transparent);
+  background: color-mix(in srgb, var(--danger) 7%, var(--surface));
+  color: var(--danger);
+}
+
+/* 「已理解」标签：让用户知道助手从这句话里解析出了什么 */
+.intentChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  align-self: flex-start;
+  padding: 4px 10px;
+  border: 1px solid color-mix(in srgb, var(--accent) 24%, transparent);
+  border-radius: var(--radius-pill);
+  background: var(--accent-soft);
+  font-size: 11.5px;
+  color: var(--accent-strong);
+}
+
+.intentChipLabel {
+  padding: 0 5px;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  font-size: 10px;
+}
+
+/* ------------------------------ 商品卡 ------------------------------ */
+
+.products {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+
+.productCard {
+  display: grid;
+  grid-template-columns: 58px minmax(0, 1fr) 16px;
+  align-items: center;
+  gap: 10px;
+  padding: 9px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+  transition:
+    border-color var(--transition),
+    box-shadow var(--transition),
+    transform var(--transition);
+}
+
+.productCard:hover {
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-md);
+  transform: translateY(-1px);
+}
+
+.productThumb {
+  width: 58px;
+  overflow: hidden;
+  border-radius: var(--radius-sm);
+}
+
+.productInfo {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.productTitle {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  font-size: 12.5px;
+  font-weight: 650;
+  line-height: 1.4;
+  color: var(--text);
+}
+
+.productMeta {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+  font-size: 11px;
+  color: var(--text-subtle);
+}
+
+.productPrice {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--accent-strong);
+  font-variant-numeric: tabular-nums;
+}
+
+.productCategory {
+  padding: 0 6px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: var(--surface-2);
+  line-height: 16px;
+}
+
+.productSeller {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.productReason {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  font-size: 11px;
+  line-height: 1.55;
+  color: var(--text-muted);
+}
+
+.productArrow {
+  display: grid;
+  place-items: center;
+  color: var(--text-subtle);
 }
 
 /* 每一行单独成块，保留模型回复里的换行与列表感 */
@@ -187,20 +602,17 @@
 /* ------------------------------ 输入条 ------------------------------ */
 
 .composer {
-  position: fixed;
-  left: 50%;
-  bottom: 18px;
-  z-index: 55;
   display: flex;
+  flex: none;
   align-items: flex-end;
   gap: 8px;
   width: min(760px, calc(100% - 32px));
+  margin: 0 auto 16px;
   padding: 8px 8px 8px 14px;
-  transform: translateX(-50%);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   background: var(--surface);
-  box-shadow: var(--shadow-lg);
+  box-shadow: var(--shadow-md);
 }
 
 .input {
@@ -252,47 +664,73 @@
   color: var(--text-subtle);
 }
 
-.clearBtn {
-  height: 28px;
-  padding: 0 12px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-pill);
-  background: var(--surface);
-  font-size: 12px;
-  color: var(--text-muted);
-  transition:
-    color var(--transition),
-    border-color var(--transition),
-    background-color var(--transition);
-}
-
-.clearBtn:hover {
-  color: var(--text);
-  border-color: var(--border-strong);
-  background: var(--surface-hover);
-}
-
 /* ------------------------------ 响应式 ------------------------------ */
+
+/* 抽屉：< 880px 时侧边栏隐藏，由页头「历史」按钮开合 */
+@media (max-width: 880px) {
+  .historyToggle {
+    display: inline-flex;
+  }
+
+  .backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 75;
+    display: block;
+    border: 0;
+    background: rgba(20, 18, 16, 0.42);
+    backdrop-filter: blur(3px);
+    -webkit-backdrop-filter: blur(3px);
+  }
+
+  .sidebar {
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 80;
+    width: min(300px, 86vw);
+    padding: calc(18px + env(safe-area-inset-top)) 12px 18px;
+    border-right: 1px solid var(--border);
+    box-shadow: var(--shadow-lg);
+    transform: translateX(-102%);
+    transition: transform 260ms var(--ease);
+  }
+
+  .sidebarOpen {
+    transform: none;
+  }
+}
 
 @media (max-width: 600px) {
   .main {
     gap: 12px;
-    padding: 12px 16px 124px;
+    padding: 12px 16px 10px;
   }
 
   .composer {
-    bottom: 0;
-    width: 100%;
-    padding: 8px 10px calc(8px + env(safe-area-inset-bottom)) 14px;
-    border-right: 0;
-    border-bottom: 0;
-    border-left: 0;
-    border-radius: var(--radius-md) var(--radius-md) 0 0;
+    width: calc(100% - 24px);
+    margin: 0 auto calc(10px + env(safe-area-inset-bottom));
+    padding: 8px 8px 8px 12px;
+    border-radius: var(--radius-md);
+  }
+
+  .messageBody {
+    max-width: 86%;
   }
 
   .bubbleAssistant,
   .bubbleUser {
-    max-width: 84%;
     font-size: 13px;
+  }
+
+  .productCard {
+    grid-template-columns: 52px minmax(0, 1fr) 14px;
+    gap: 8px;
+    padding: 8px;
+  }
+
+  .productThumb {
+    width: 52px;
   }
 }

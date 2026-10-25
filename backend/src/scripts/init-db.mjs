@@ -56,6 +56,8 @@ const TABLES = [
   'revoked_tokens',
   'user_token_epochs',
   'password_reset_tokens',
+  'assistant_conversations',
+  'assistant_messages',
 ]
 
 /**
@@ -63,10 +65,17 @@ const TABLES = [
  *   schema.sql       用户 / 商品 / 购物车 / 评价 / 收藏
  *   orders.sql       订单 / 订单明细 / 支付
  *   auth-extra.sql   JWT 黑名单 / 用户凭证时间线 / 找回密码令牌
+ *   assistant.sql    AI 助手会话与消息（对话落库）
  *   search-index.sql 商品名 + 昵称的 ngram 全文索引（幂等，已存在则跳过）
- * 四个脚本都可以重复执行。
+ * 五个脚本都可以重复执行。
  */
-const SCHEMA_FILES = ['schema.sql', 'orders.sql', 'auth-extra.sql', 'search-index.sql']
+const SCHEMA_FILES = [
+  'schema.sql',
+  'orders.sql',
+  'auth-extra.sql',
+  'assistant.sql',
+  'search-index.sql',
+]
 
 const baseConfig = {
   host: DB_HOST,

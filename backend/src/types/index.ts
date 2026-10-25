@@ -6,6 +6,9 @@
  * 这样写也能防止以后有人往这些文件里加运行期常量时把整个出口带坏。
  */
 export type * from './common'
+export type * from './assistant.entity'
+export type * from './assistant.dto'
+export type * from './assistant.vo'
 export type * from './auth.entity'
 export type * from './auth.dto'
 export type * from './auth.vo'

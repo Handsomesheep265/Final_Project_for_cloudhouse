@@ -16,6 +16,7 @@ import cors from 'cors'
 import { env } from './config/env'
 import { closePool, pingDatabase } from './config/database'
 import { errorHandler } from './middlewares/errorHandler'
+import { assistantRouter } from './routes/assistantRoutes'
 import { authRouter } from './routes/authRoutes'
 import { cartRouter } from './routes/cartRoutes'
 import { categoryRouter } from './routes/categoryRoutes'
@@ -75,6 +76,7 @@ export function createApp(): Express {
 
   // 业务路由
   app.use('/api/auth', authRouter)
+  app.use('/api/assistant', assistantRouter)
   app.use('/api/categories', categoryRouter)
   app.use('/api/search', searchRouter)
   app.use('/api/products', productRouter)
@@ -118,6 +120,10 @@ async function bootstrap(): Promise<void> {
     console.log('              POST /api/auth/reset-password（用链接里的令牌改密码）')
     console.log('              GET  /api/auth/me（当前会话，返回新 token；带 Authorization: Bearer <token>）')
     console.log('   鉴权方式   Authorization: Bearer <token>（购物车 / 订单 / 个人主页未登录返回 401 40102）')
+    console.log('   AI 助手    POST /api/assistant/chat（按商品库检索并给出推荐理由；登录时自动落库）')
+    console.log('              GET  /api/assistant/conversations（历史对话，需登录）')
+    console.log('              POST /api/assistant/conversations（开启新对话）')
+    console.log('              GET/DELETE /api/assistant/conversations/:id（查看 / 删除）')
     console.log('   搜索接口   GET  /api/search?keyword=手帐&type=all')
     console.log('   分类接口   GET  /api/categories')
     console.log('   商品接口   GET  /api/products/:productId（详情）')

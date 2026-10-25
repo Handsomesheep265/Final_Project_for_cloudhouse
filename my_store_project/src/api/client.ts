@@ -44,8 +44,7 @@ function isCredentialCheck(path: string): boolean {
 }
 
 /** 拼鉴权头：有 token 就带 Bearer，没有就不带（公开接口照样能访问） */
-function authHeaders(): Record<string, string> {
-  const token = getToken()
+function authHeaders(token: string | null): Record<string, string> {
   return token ? { authorization: `Bearer ${token}` } : {}
 }
 
@@ -55,40 +54,65 @@ function authHeaders(): Record<string, string> {
  *   - 解析 { code, message, data }，code !== 0 时抛 ApiError
  *   - 401 全局拦截：清本地凭证 → 通知 AuthBootstrap 跳登录页（登录页会记住来的位置）
  *   - 网络不通（后端没启动）也转成 ApiError，页面可以给出可读提示
+ *
+ * 关于「续期轮换」引发的一次 401：
+ *   /api/auth/me 会给用户换发新 token，并把刚出示的旧 token 拉黑。
+ *   如果页面同时还有别的请求在用旧 token（例如刚进助手页就拉历史），
+ *   它们可能在轮换之后才到达后端 → 401。这不是登录失效。
+ *   所以 401 时先看本地 token 是否已经被换掉：变了就用新 token 重试一次，
+ *   没变（或重试仍 401）才算真的失效，再走全局登出。
  */
 export async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const { method = 'GET', body, silentUnauthorized = false } = options
 
-  let response: Response
-  try {
-    response = await fetch(`${API_BASE}${path}`, {
-      method,
-      headers: {
-        ...authHeaders(),
-        ...(body === undefined ? {} : { 'content-type': 'application/json' }),
-      },
-      body: body === undefined ? undefined : JSON.stringify(body),
-    })
-  } catch {
-    throw new ApiError('无法连接后端服务，请确认 backend 已启动（npm run dev）', {
-      code: -1,
-      status: 0,
-      isNetworkError: true,
-    })
+  const send = async (token: string | null): Promise<Response> => {
+    try {
+      return await fetch(`${API_BASE}${path}`, {
+        method,
+        headers: {
+          ...authHeaders(token),
+          ...(body === undefined ? {} : { 'content-type': 'application/json' }),
+        },
+        body: body === undefined ? undefined : JSON.stringify(body),
+      })
+    } catch {
+      throw new ApiError('无法连接后端服务，请确认 backend 已启动（npm run dev）', {
+        code: -1,
+        status: 0,
+        isNetworkError: true,
+      })
+    }
+  }
+
+  const token = getToken()
+  let response = await send(token)
+
+  // 轮换竞态：本次用的 token 已被另一个请求换掉 → 用最新的 token 重试一次。
+  // 401 是鉴权中间件在进入业务逻辑之前返回的，重试不会重复执行业务写操作。
+  let usedToken = token
+  if (response.status === 401 && token !== null) {
+    const latest = getToken()
+    if (latest !== null && latest !== token) {
+      usedToken = latest
+      response = await send(latest)
+    }
   }
 
   let payload: ApiResponse<T> | null = null
   try {
     payload = (await response.json()) as ApiResponse<T>
   } catch {
-    // 响应不是 JSON（例如网关/代理返回了 HTML 错误页），按未知失败处理
+    // 响应不是 JSON（例如网关/代理返回的 HTML 错误页），按未知失败处理
   }
 
   if (!response.ok || payload === null || payload.code !== 0) {
     // 401 = 没登录 / token 过期：清掉本地凭证并交给全局拦截器处理
     if (response.status === 401 && !silentUnauthorized && !isCredentialCheck(path)) {
-      clearSession()
-      notifyUnauthorized(payload?.message)
+      // 重试过就别再拿旧 token 的失败结果去清账号
+      if (getToken() === usedToken) {
+        clearSession()
+        notifyUnauthorized(payload?.message)
+      }
     }
 
     throw new ApiError(payload?.message ?? `请求失败（HTTP ${response.status}）`, {
