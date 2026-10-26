@@ -52,8 +52,9 @@ src/assets/
 
 ## 三、补充说明
 
-- `.gitkeep` 只是为了占住空目录，图片补齐后可以删掉。
+- 图片已经补齐，`.gitkeep` 占位文件已删除。
 - 该目录下的所有图片都会被 `assetUrl.js` 的 `import.meta.glob` 打包进来，
   所以请只放首页真正用到的图，避免无谓增大产物体积。
 - 如果后续想加首页轮播 banner（对应数据库 `banners` 表），建议放在
   `src/assets/banner/` 下，例如 `src/assets/banner/hero-banner.jpg`。
+- 每张图的来源与生成方式见 [SOURCES.md](./SOURCES.md)。
